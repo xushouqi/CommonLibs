@@ -11,6 +11,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\CAP\src\DotNetCore.CAP\DotNetCore.CAP.csproj" />
     <ProjectReference Include="..\CommonLibs\CommonLibs.csproj" />
   </ItemGroup>
 
