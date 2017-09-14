@@ -9,6 +9,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CommonNetwork", "CommonNetw
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CommonServices", "CommonServices\CommonServices.csproj", "{B1F3A12F-8C21-4C07-BDF6-8855FB75757C}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DotNetCore.CAP", "..\CAP\src\DotNetCore.CAP\DotNetCore.CAP.csproj", "{1A23D0A6-59AD-4DBB-B1D7-A414443B3ECF}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -27,6 +29,10 @@ Global
 		{B1F3A12F-8C21-4C07-BDF6-8855FB75757C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B1F3A12F-8C21-4C07-BDF6-8855FB75757C}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B1F3A12F-8C21-4C07-BDF6-8855FB75757C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1A23D0A6-59AD-4DBB-B1D7-A414443B3ECF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1A23D0A6-59AD-4DBB-B1D7-A414443B3ECF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1A23D0A6-59AD-4DBB-B1D7-A414443B3ECF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1A23D0A6-59AD-4DBB-B1D7-A414443B3ECF}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
