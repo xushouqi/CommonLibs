@@ -438,7 +438,11 @@ namespace CommonServices.Caching
         {
             throw new NotImplementedException();
         }
-        public async Task RemoveAsync(T item)
+        public async Task<bool> RemoveAsync(T item)
+        {
+            throw new NotImplementedException();
+        }
+        public async Task<bool> RemoveAsync(int id)
         {
             throw new NotImplementedException();
         }

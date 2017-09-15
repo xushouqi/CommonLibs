@@ -9,7 +9,7 @@ namespace CommonLibs
 
         public ReturnData()
         {
-            ErrorCode = ErrorCodeEnum.ResponseError;
+            ErrorCode = ErrorCodeEnum.Success;
             Data = default(T);
         }
         public ReturnData(T data)

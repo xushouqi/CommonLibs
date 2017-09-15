@@ -73,7 +73,7 @@ namespace CommonNetwork
             {
                 if (m_waitReceiver == null || m_waitReceiver.Status != TaskStatus.Running)
                 {
-                    await m_socket.ConnectAsync(new Uri(m_url), new CancellationTokenSource(60000).Token);
+                    await m_socket.ConnectAsync(new Uri(m_url), new CancellationTokenSource(6000).Token);
 
                     m_waitReceiver = new Task(() => { WaitReceive().Wait(); });
                     m_waitReceiver.Start();
@@ -107,7 +107,7 @@ namespace CommonNetwork
             {
                 if (m_waitReceiver == null || m_waitReceiver.Status != TaskStatus.Running)
                 {
-                    m_socket.ConnectAsync(new Uri(m_url), new CancellationTokenSource(60000).Token).Wait();
+                    m_socket.ConnectAsync(new Uri(m_url), new CancellationTokenSource(6000).Token).Wait();
 
                     m_waitReceiver = new Task(() => { WaitReceive().Wait(); });
                     m_waitReceiver.Start();
@@ -219,10 +219,17 @@ namespace CommonNetwork
 
         public void CloseConnection()
         {
-            if (m_socket != null)
+            if (m_socket != null && (m_socket.State == WebSocketState.Open || m_socket.State == WebSocketState.Connecting))
             {
-                //m_socket.CloseAsync(WebSocketCloseStatus.Empty, "", new CancellationToken()).Wait();
-                m_socket.CloseOutputAsync(WebSocketCloseStatus.Empty, "", new CancellationTokenSource(60000).Token).Wait();
+                try
+                {
+                    //m_socket.CloseAsync(WebSocketCloseStatus.Empty, "", new CancellationToken()).Wait();
+                    m_socket.CloseOutputAsync(WebSocketCloseStatus.Empty, "", new CancellationTokenSource(3000).Token).Wait();
+                }
+                catch (Exception e)
+                {
+                    OnError(e.Message);
+                }
             }
         }
 
@@ -244,7 +251,7 @@ namespace CommonNetwork
             var package = CreatePackage(actionId, param);
 
             var result = ProtoBufUtils.Serialize(package);
-            m_socket.SendAsync(new ArraySegment<byte>(result), WebSocketMessageType.Binary, true, new CancellationTokenSource(60000).Token).Wait();
+            m_socket.SendAsync(new ArraySegment<byte>(result), WebSocketMessageType.Binary, true, new CancellationTokenSource(9000).Token).Wait();
 
             m_callbacks[package.ID] = callback;
             return package;
@@ -255,7 +262,7 @@ namespace CommonNetwork
             var package = CreatePackage(actionId, param);
 
             var result = ProtoBufUtils.Serialize(package);
-            await m_socket.SendAsync(new ArraySegment<byte>(result), WebSocketMessageType.Binary, true, new CancellationTokenSource(60000).Token);
+            await m_socket.SendAsync(new ArraySegment<byte>(result), WebSocketMessageType.Binary, true, new CancellationTokenSource(9000).Token);
 
             Task task = new Task(() =>
             {

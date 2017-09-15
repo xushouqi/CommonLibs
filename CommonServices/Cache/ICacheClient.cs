@@ -52,7 +52,8 @@ namespace CommonServices.Caching
         Task<List<T>> WhereToListAsync(Expression<Func<T, bool>> where);
         Task AddAsync(T item);
         Task UpdateAsync(T item);
-        Task RemoveAsync(T item);
+        Task<bool> RemoveAsync(T item);
+        Task<bool> RemoveAsync(int id);
         Task AddRangeAsync(IEnumerable<T> datas);
         Task UpdateRangeAsync(IEnumerable<T> datas);
         Task RemoveRangeAsync(IEnumerable<T> datas);

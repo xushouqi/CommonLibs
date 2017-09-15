@@ -153,7 +153,7 @@ namespace CommonLibs
             }
             request.Method = "POST";
             request.ContentType = "application/octet-stream";
-            //request.Timeout = 10000;
+            request.Timeout = 3000;
 
             if (cookies != null)
             {

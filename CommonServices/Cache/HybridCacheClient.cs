@@ -5,6 +5,8 @@ using System.Linq.Expressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Configuration;
 using CommonLibs;
 using DotNetCore.CAP;
 
@@ -26,15 +28,23 @@ namespace CommonServices.Caching
         //private readonly string _cacheId = Guid.NewGuid().ToString("N");
         private readonly string _cacheId = string.Empty;
         private readonly string m_removeKey = string.Empty;
+        private readonly bool EnableDistributeCache = true;
 
         public HybridCacheClient(ICapPublisher publisher,
             IServiceProvider services,
+            IConfiguration config,
             ILoggerFactory loggerFactory = null
             //, ICacheClient<T> distributedCacheClient
             )
         {
             _services = services;
-            _logger = loggerFactory.CreateLogger<HybridCacheClient<T>>();
+
+            if (loggerFactory != null)
+                _logger = loggerFactory.CreateLogger<HybridCacheClient<T>>();
+
+            if (config != null && config.GetSection("EnableDistributeCache") != null)
+                EnableDistributeCache = bool.Parse(config.GetSection("EnableDistributeCache").Value);
+
             //_distributedCache = distributedCacheClient;
             _publisher = publisher;
             //_messageBus.SubscribeAsync<InvalidateCache>(OnRemoteCacheItemExpiredAsync).GetAwaiter().GetResult();
@@ -69,8 +79,10 @@ namespace CommonServices.Caching
             if (!args.SendNotification)
                 return;
 
-            _logger.LogTrace("Local cache expired event: key={0}", args.Key);
-            await _publisher.PublishAsync(m_removeKey, new InvalidateCache { CacheId = _cacheId, Keys = new[] { args.Key }, Expired = true });
+            if (_logger != null)
+                _logger.LogTrace("Local cache expired event: key={0}", args.Key);
+            if (EnableDistributeCache)
+                await _publisher.PublishAsync(m_removeKey, new InvalidateCache { CacheId = _cacheId, Keys = new[] { args.Key }, Expired = true });
             //await _messageBus.PublishAsync(new InvalidateCache { CacheId = _cacheId, Keys = new[] { args.Key }, Expired = true }).AnyContext();
         }
 
@@ -79,12 +91,14 @@ namespace CommonServices.Caching
             if (!String.IsNullOrEmpty(message.CacheId) && String.Equals(_cacheId, message.CacheId))
                 return;
 
-            _logger.LogTrace(String.Format("Invalidating local cache from remote: id={0} expired={1} keys={2}", message.CacheId, message.Expired, String.Join(",", message.Keys ?? new string[] { })));
+            if (_logger != null)
+                _logger.LogTrace(String.Format("Invalidating local cache from remote: id={0} expired={1} keys={2}", message.CacheId, message.Expired, String.Join(",", message.Keys ?? new string[] { })));
             Interlocked.Increment(ref _invalidateCacheCalls);
             if (message.FlushAll)
             {
                 await _localCache.RemoveAllAsync().AnyContext();
-                _logger.LogTrace("Fushed local cache");
+                if (_logger != null)
+                    _logger.LogTrace("Fushed local cache");
             }
             else if (message.Keys != null && message.Keys.Length > 0)
             {
@@ -100,18 +114,21 @@ namespace CommonServices.Caching
                 }
 
                 int results = await _localCache.RemoveAllAsync(keysToRemove).AnyContext();
-                _logger.LogTrace("Removed {0} keys from local cache", results);
+                if (_logger != null)
+                    _logger.LogTrace("Removed {0} keys from local cache", results);
             }
             else
             {
-                _logger.LogWarning("Unknown invalidate cache message");
+                if (_logger != null)
+                    _logger.LogWarning("Unknown invalidate cache message");
             }
         }
 
         public async Task<int> RemoveAllAsync(IEnumerable<string> keys = null)
         {
             bool flushAll = keys == null || !keys.Any();
-            await _publisher.PublishAsync(m_removeKey, new InvalidateCache { CacheId = _cacheId, FlushAll = flushAll, Keys = keys?.ToArray() });
+            if (EnableDistributeCache)
+                await _publisher.PublishAsync(m_removeKey, new InvalidateCache { CacheId = _cacheId, FlushAll = flushAll, Keys = keys?.ToArray() });
             //await _messageBus.PublishAsync(new InvalidateCache { CacheId = _cacheId, FlushAll = flushAll, Keys = keys?.ToArray() }).AnyContext();
             return await _localCache.RemoveAllAsync(keys).AnyContext();
             //return await _distributedCache.RemoveAllAsync(keys).AnyContext();
@@ -119,7 +136,8 @@ namespace CommonServices.Caching
 
         public async Task<int> RemoveByPrefixAsync(string prefix)
         {
-            await _publisher.PublishAsync(m_removeKey, new InvalidateCache { CacheId = _cacheId, Keys = new[] { prefix + "*" } });
+            if (EnableDistributeCache)
+                await _publisher.PublishAsync(m_removeKey, new InvalidateCache { CacheId = _cacheId, Keys = new[] { prefix + "*" } });
             //await _messageBus.PublishAsync(new InvalidateCache { CacheId = _cacheId, Keys = new[] { prefix + "*" } }).AnyContext();
             return await _localCache.RemoveByPrefixAsync(prefix).AnyContext();
             //return await _distributedCache.RemoveByPrefixAsync(prefix).AnyContext();
@@ -131,12 +149,14 @@ namespace CommonServices.Caching
             var cacheValue = await _localCache.GetAsync(key).AnyContext();
             if (cacheValue != null)
             {
-                _logger.LogTrace("Local cache hit: {0}", key);
+                if (_logger != null)
+                    _logger.LogTrace("Local cache hit: {0}", key);
                 Interlocked.Increment(ref _localCacheHits);
             }
             else
             {
-                _logger.LogTrace("Local cache miss: {0}", key);
+                if (_logger != null)
+                    _logger.LogTrace("Local cache miss: {0}", key);
                 if (prefix.Equals("ID"))
                 {
                     using (var repo = _repository)
@@ -157,11 +177,15 @@ namespace CommonServices.Caching
             var cacheValue = await _localCache.GetAsync(key).AnyContext();
             if (cacheValue != null)
             {
-                _logger.LogTrace("Local cache hit: {0}", key);
+                if (_logger != null)
+                    _logger.LogTrace("Local cache hit: {0}", key);
                 Interlocked.Increment(ref _localCacheHits);
             }
             else
-                _logger.LogTrace("Local cache miss: {0}", key);
+            {
+                if (_logger != null)
+                    _logger.LogTrace("Local cache miss: {0}", key);
+            }
             return cacheValue;
 
             //cacheValue = await _distributedCache.GetAsync(key).AnyContext();
@@ -225,7 +249,8 @@ namespace CommonServices.Caching
         }
         public async Task<bool> AddAsync(string key, T value, TimeSpan? expiresIn = null)
         {
-            _logger.LogTrace("Adding key \"{0}\" to local cache with expiration: {1}", key, expiresIn);
+            if (_logger != null)
+                _logger.LogTrace("Adding key \"{0}\" to local cache with expiration: {1}", key, expiresIn);
             //bool added = await _distributedCache.AddAsync(key, value, expiresIn).AnyContext();
             //if (added)
                 bool added = await _localCache.SetAsync(key, value, expiresIn).AnyContext();
@@ -244,8 +269,10 @@ namespace CommonServices.Caching
         }
         public async Task<bool> SetAsync(string key, T value, TimeSpan? expiresIn = null)
         {
-            _logger.LogTrace("Setting key \"{0}\" to local cache with expiration: {1}", key, expiresIn);
-            await _publisher.PublishAsync(m_removeKey, new InvalidateCache { CacheId = _cacheId, Keys = new[] { key } });
+            if (_logger != null)
+                _logger.LogTrace("Setting key \"{0}\" to local cache with expiration: {1}", key, expiresIn);
+            if (EnableDistributeCache)
+                await _publisher.PublishAsync(m_removeKey, new InvalidateCache { CacheId = _cacheId, Keys = new[] { key } });
             //await _messageBus.PublishAsync(new InvalidateCache { CacheId = _cacheId, Keys = new[] { key } }).AnyContext();
             return await _localCache.SetAsync(key, value, expiresIn).AnyContext();
 
@@ -257,8 +284,10 @@ namespace CommonServices.Caching
             if (values == null || values.Count == 0)
                 return 0;
 
-            _logger.LogTrace("Adding keys \"{0}\" to local cache with expiration: {1}", values.Keys, expiresIn);
-            await _publisher.PublishAsync(m_removeKey, new InvalidateCache { CacheId = _cacheId, Keys = values.Keys.ToArray() });
+            if (_logger != null)
+                _logger.LogTrace("Adding keys \"{0}\" to local cache with expiration: {1}", values.Keys, expiresIn);
+            if (EnableDistributeCache)
+                await _publisher.PublishAsync(m_removeKey, new InvalidateCache { CacheId = _cacheId, Keys = values.Keys.ToArray() });
             //await _messageBus.PublishAsync(new InvalidateCache { CacheId = _cacheId, Keys = values.Keys.ToArray() }).AnyContext();
             return await _localCache.SetAllAsync(values, expiresIn).AnyContext();
             //return await _distributedCache.SetAllAsync(values, expiresIn).AnyContext();
@@ -266,7 +295,8 @@ namespace CommonServices.Caching
 
         public async Task<bool> ReplaceAsync(string key, T value, TimeSpan? expiresIn = null)
         {
-            await _publisher.PublishAsync(m_removeKey, new InvalidateCache { CacheId = _cacheId, Keys = new[] { key } });
+            if (EnableDistributeCache)
+                await _publisher.PublishAsync(m_removeKey, new InvalidateCache { CacheId = _cacheId, Keys = new[] { key } });
             //await _messageBus.PublishAsync(new InvalidateCache { CacheId = _cacheId, Keys = new[] { key } }).AnyContext();
             return await _localCache.ReplaceAsync(key, value, expiresIn).AnyContext();
             //return await _distributedCache.ReplaceAsync(key, value, expiresIn).AnyContext();
@@ -318,7 +348,8 @@ namespace CommonServices.Caching
         {
             await _localCache.SetExpirationAsync(key, expiresIn).AnyContext();
             //await _distributedCache.SetExpirationAsync(key, expiresIn).AnyContext();
-            await _publisher.PublishAsync(m_removeKey, new InvalidateCache { CacheId = _cacheId, Keys = new[] { key } });
+            if (EnableDistributeCache)
+                await _publisher.PublishAsync(m_removeKey, new InvalidateCache { CacheId = _cacheId, Keys = new[] { key } });
             //await _messageBus.PublishAsync(new InvalidateCache { CacheId = _cacheId, Keys = new[] { key } }).AnyContext();
         }
 
@@ -384,16 +415,42 @@ namespace CommonServices.Caching
                 await SetAsync(item.GetId(), item);
             }
         }
-        public async Task RemoveAsync(T item)
+        /// <summary>
+        /// 从数据库删除
+        /// </summary>
+        /// <param name="item"></param>
+        /// <returns></returns>
+        public async Task<bool> RemoveAsync(T item)
         {
+            bool ret = false;
             var key = string.Concat("ID", item.GetId());
-            await RemoveAllAsync(new List<string>() { key });
+            var count = await RemoveAllAsync(new List<string>() { key });
 
             using (var repo = _repository)
             {
                 repo.Remove(item);
                 await repo.SaveChangesAsync();
+                ret = true;
             }
+            return ret;
+        }
+        public async Task<bool> RemoveAsync(int id)
+        {
+            bool ret = false;
+            var key = string.Concat("ID", id);
+            await RemoveAllAsync(new List<string>() { key });
+
+            using (var repo = _repository)
+            {
+                var item = repo.Find(id);
+                if (item != null)
+                {
+                    repo.Remove(item);
+                    await repo.SaveChangesAsync();
+                    ret = true;
+                }
+            }
+            return ret;
         }
         public async Task AddRangeAsync(IEnumerable<T> datas)
         {

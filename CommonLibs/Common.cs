@@ -16,6 +16,11 @@ namespace CommonLibs
 
     public class Common
     {
+        public static void DebugLog(string words, params object[] args)
+        {
+            Console.WriteLine(words, args);
+        }
+
         /// <summary>
         /// 根據cookie name 获取cookie value
         /// </summary>
