@@ -42,8 +42,9 @@ namespace CommonServices.Caching
             if (loggerFactory != null)
                 _logger = loggerFactory.CreateLogger<HybridCacheClient<T>>();
 
-            if (config != null && config.GetSection("EnableDistributeCache") != null)
-                EnableDistributeCache = bool.Parse(config.GetSection("EnableDistributeCache").Value);
+            EnableDistributeCache = true;
+            //if (config != null && config.GetSection("EnableDistributeCache") != null)
+            //    EnableDistributeCache = bool.Parse(config.GetSection("EnableDistributeCache").Value);
 
             //_distributedCache = distributedCacheClient;
             _publisher = publisher;

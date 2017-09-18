@@ -33,7 +33,7 @@ namespace CommonLibs
             }
         }
         private static string _PrivKeyXml = string.Empty;
-        public static string PrivKeyXml
+        public static string PrivKeyXML
         {
             get
             {
@@ -55,12 +55,14 @@ namespace CommonLibs
             }
         }
 
-        public static byte[] EncryptFromString(string input)
+        public static byte[] EncryptFromString(string input, string pubKeyXml = null)
         {
             byte[] cipherBytes = null;
             try
             {
-                using (var rsa = CreateRsaFromPublicKey(PubKeyXML))
+                if (string.IsNullOrEmpty(pubKeyXml))
+                    pubKeyXml = PubKeyXML;
+                using (var rsa = CreateRsaFromPublicKey(pubKeyXml))
                 {
                     var plainTextBytes = Encoding.UTF8.GetBytes(input);
                     //cipherBytes = rsa.Encrypt(plainTextBytes, RSAEncryptionPadding.Pkcs1);
@@ -96,12 +98,14 @@ namespace CommonLibs
             return cipherBytes;
         }
 
-        public static string DecryptToString(byte[] input)
+        public static string DecryptToString(byte[] input, string privKeyXml = null)
         {
             string plainText = "";
             try
             {
-                using (var rsa = CreateRsaFromPrivateKey(PrivKeyXml))
+                if (string.IsNullOrEmpty(privKeyXml))
+                    privKeyXml = PrivKeyXML;
+                using (var rsa = CreateRsaFromPrivateKey(privKeyXml))
                 {
                     //var plainTextBytes = rsa.Decrypt(input, RSAEncryptionPadding.Pkcs1);
                     //plainText = Encoding.UTF8.GetString(plainTextBytes);
@@ -136,10 +140,10 @@ namespace CommonLibs
             return plainText;
         }
 
-        public static string DecryptToString(string cipherText)
+        public static string DecryptToString(string cipherText, string privKeyXml = null)
         {
             var input = Convert.FromBase64String(cipherText);
-            return DecryptToString(input);
+            return DecryptToString(input, privKeyXml);
         }
 
         private static RSA CreateRsaFromPrivateKey(string privateKey)
