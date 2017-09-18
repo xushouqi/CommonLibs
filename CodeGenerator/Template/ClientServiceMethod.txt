@@ -1,0 +1,16 @@
+﻿    
+		public void Submit#MethodName#(#MethodParams#Action<ErrorCodeEnum, #ReturnType#> callback)
+		{
+			if (m_client.CheckConnection() && m_#MethodName#Callback == null)
+			{
+				var pars = new PackageParams();
+#WriteParams#
+				var pardata = pars.PopBuffer();
+				pars.Dispose();
+
+				var package = m_client.Send(#ActionId#, pardata, On#MethodName#CallBack);
+				if (package != null && callback != null)
+					m_#MethodName#Callback = callback;
+			}
+		}
+	

@@ -1,0 +1,20 @@
+﻿		/// <summary>
+        /// #Tips#
+        /// </summary>
+        public static async Task<#WithReturnType#> #MethodName#Async(#MethodParams#)
+        {
+            string url = ClientCommon.GetUrl("#ServerName#") + "/#Route#/?" + #QueryString#;
+            HttpClient client = new HttpClient();
+			client.DefaultRequestHeaders.Clear();
+            #TokenHeader#
+            var response = await client.GetAsync(url);
+            #WithReturnType# retData = new #WithReturnType#();
+            retData.ErrorCode = ErrorCodeEnum.ResponseError;
+
+            if (response.IsSuccessStatusCode)
+            {
+                string tmp = response.Content.ReadAsStringAsync().Result;
+				retData = JsonConvert.DeserializeObject<#WithReturnType#>(tmp);
+            }
+            return retData;
+        }

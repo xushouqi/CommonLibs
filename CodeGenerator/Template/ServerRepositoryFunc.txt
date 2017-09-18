@@ -1,0 +1,7 @@
+﻿
+			services.AddTransient<IRepository<#Type#>>(sp =>
+            {
+                var icache = sp.GetRequiredService<HybridCacheClient>();
+                var context = sp.GetRequiredService<TeamDbContext>();
+                return new Repository<#Type#, TeamDbContext>(context, context.#PropertyName#, icache);
+            });

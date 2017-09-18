@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "CodeGenerator": {
+      "commandName": "Project",
+      "commandLineArgs": " Template C:\\SVN\\EClub\\Servers\\GodIdentity\\bin\\Debug\\netcoreapp2.0\\GodIdentity.dll"
+    }
+  }
+}

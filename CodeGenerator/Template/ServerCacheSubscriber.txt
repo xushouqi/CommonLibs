@@ -1,0 +1,33 @@
+﻿using System;
+using System.Threading.Tasks;
+using DotNetCore.CAP;
+using CommonServices.Caching;
+
+namespace #ProjectName#
+{
+    public interface ISubscriberService
+    {
+        Task RemoveCache(InvalidateCache message);
+    }
+
+    public class CacheSubscriber : ICapSubscribe ,ISubscriberService
+    {
+        private readonly IServiceProvider _services;
+
+        public CacheSubscriber(IServiceProvider services)
+        {
+            _services = services;
+        }
+
+        [CapSubscribe("cache.data.remove")]
+        public async Task RemoveCache(InvalidateCache message)
+        {
+            switch (message.CacheId)
+            {
+#SwitchCacheClient#
+                default:
+                    break;
+            }
+        }
+    }
+}

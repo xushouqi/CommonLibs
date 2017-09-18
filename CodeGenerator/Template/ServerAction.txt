@@ -1,0 +1,38 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using #ProjectName#.Services;
+using CommonLibs;
+using CommonNetwork;
+using AutoMapper;
+using #ModelProject#;
+using #ModelProject#.ViewModels;
+
+namespace #ProjectName#.Actions
+{
+	#Attribute#
+    public class Action#ActionId# : ActionBase<#ReturnType#>
+    {
+        private readonly #ServiceName# m_service;
+
+        public Action#ActionId#(
+            #ServiceName# service)
+        {
+            m_service = service;
+            m_actionId = #ActionId#;
+        }
+        
+        public override async Task DoAction()
+        {
+            if (m_params != null)
+            {
+#ReadParams#
+                var retData = await m_service.#MethodName#(#Params#);
+				#MapperReturn#
+                m_return = data;
+            }
+            await base.DoAction();
+        }
+    }
+}

@@ -1,0 +1,20 @@
+﻿    
+		private Action<ErrorCodeEnum, #ReturnType#> m_#MethodName#Callback = null;
+		private Action<ErrorCodeEnum, #ReturnType#> m_#MethodName#CallbackAdd = null;
+
+		void On#MethodName#CallBack(WebPackage package)
+		{
+			if (m_#MethodName#Callback != null || m_#MethodName#CallbackAdd != null)
+			{
+				var retData = ProtoBufUtils.Deserialize<#ReturnType#>(package.Return);
+
+				if (m_#MethodName#Callback != null)
+				{
+					m_#MethodName#Callback(package.MyError, retData);
+					m_#MethodName#Callback = null;
+				}
+			
+				if (m_#MethodName#CallbackAdd != null)
+					m_#MethodName#CallbackAdd(package.MyError, retData);
+			}
+		}

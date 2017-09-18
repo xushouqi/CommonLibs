@@ -1,0 +1,10 @@
+﻿using ProtoBuf;
+
+namespace #ProjectName#.ViewModels
+{
+    [ProtoContract]
+    public class #TypeName#Data
+    {
+#Datas#
+    }
+}

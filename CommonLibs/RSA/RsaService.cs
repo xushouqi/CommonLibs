@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.IO;
 using System.Text;
+using System.Threading;
 using System.Security.Cryptography;
 
 namespace CommonLibs
@@ -55,14 +56,73 @@ namespace CommonLibs
             }
         }
 
-        public static byte[] EncryptFromString(string input, string pubKeyXml = null)
+        private static Dictionary<string, string> m_pubKeys = new Dictionary<string, string>();
+        public static string GetPublicKey(string name)
+        {
+            string key = string.Empty;
+            if (string.IsNullOrEmpty(name))
+                key = PubKeyXML;
+            else
+            {
+                lock (m_pubKeys)
+                {
+                    if (!m_pubKeys.TryGetValue(name, out key))
+                    {
+                        string curpath = Directory.GetCurrentDirectory();
+                        string filename = name + "public.key";
+                        string file = curpath + @"/" + filename;
+
+                        using (var fs = File.OpenRead(file))
+                        {
+                            using (StreamReader sr = new StreamReader(fs))
+                            {
+                                key = sr.ReadToEnd().Replace("\n", "").Replace("\r", "");
+                                m_pubKeys[name] = key;
+                                Console.WriteLine("PubKeyXML, file={0}, keyLength={1}", file, key.Length);
+                            }
+                        }
+                    }
+                }
+            }
+            return key;
+        }
+        private static Dictionary<string, string> m_privKeys = new Dictionary<string, string>();
+        public static string GetPrivateKey(string name)
+        {
+            string key = string.Empty;
+            if (string.IsNullOrEmpty(name))
+                key = PrivKeyXML;
+            else
+            {
+                lock (m_privKeys)
+                {
+                    if (!m_privKeys.TryGetValue(name, out key))
+                    {
+                        string curpath = Directory.GetCurrentDirectory();
+                        string filename = name + "private.key";
+                        string file = curpath + @"/" + filename;
+
+                        using (var fs = File.OpenRead(file))
+                        {
+                            using (StreamReader sr = new StreamReader(fs))
+                            {
+                                key = sr.ReadToEnd().Replace("\n", "").Replace("\r", "");
+                                m_privKeys[name] = key;
+                                Console.WriteLine("PrivKeyXML, file={0}, keyLength={1}", file, key.Length);
+                            }
+                        }
+                    }
+                }
+            }
+            return key;
+        }
+
+        public static byte[] EncryptFromString(string input, string keyName = null)
         {
             byte[] cipherBytes = null;
             try
             {
-                if (string.IsNullOrEmpty(pubKeyXml))
-                    pubKeyXml = PubKeyXML;
-                using (var rsa = CreateRsaFromPublicKey(pubKeyXml))
+                using (var rsa = CreateRsaFromPublicKey(GetPublicKey(keyName)))
                 {
                     var plainTextBytes = Encoding.UTF8.GetBytes(input);
                     //cipherBytes = rsa.Encrypt(plainTextBytes, RSAEncryptionPadding.Pkcs1);
@@ -98,14 +158,12 @@ namespace CommonLibs
             return cipherBytes;
         }
 
-        public static string DecryptToString(byte[] input, string privKeyXml = null)
+        public static string DecryptToString(byte[] input, string keyName = null)
         {
             string plainText = "";
             try
             {
-                if (string.IsNullOrEmpty(privKeyXml))
-                    privKeyXml = PrivKeyXML;
-                using (var rsa = CreateRsaFromPrivateKey(privKeyXml))
+                using (var rsa = CreateRsaFromPrivateKey(GetPrivateKey(keyName)))
                 {
                     //var plainTextBytes = rsa.Decrypt(input, RSAEncryptionPadding.Pkcs1);
                     //plainText = Encoding.UTF8.GetString(plainTextBytes);
@@ -140,10 +198,10 @@ namespace CommonLibs
             return plainText;
         }
 
-        public static string DecryptToString(string cipherText, string privKeyXml = null)
+        public static string DecryptToString(string cipherText, string keyName = null)
         {
             var input = Convert.FromBase64String(cipherText);
-            return DecryptToString(input, privKeyXml);
+            return DecryptToString(input, keyName);
         }
 
         private static RSA CreateRsaFromPrivateKey(string privateKey)

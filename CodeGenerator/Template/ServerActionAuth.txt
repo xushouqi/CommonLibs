@@ -1,0 +1,53 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using #ProjectName#.Services;
+using CommonLibs;
+using CommonNetwork;
+using AutoMapper;
+using #ModelProject#;
+using #ModelProject#.ViewModels;
+
+namespace #ProjectName#.Actions
+{
+	#Attribute#
+    public class Action#ActionId# : ActionBase<#ReturnType#>
+    {
+        private readonly I#ServiceName# m_service;
+        private readonly IUserManager<TeamUserData> m_userManager;
+        protected int m_roleId = 0;
+        protected int m_teamId = 0;
+
+        public Action#ActionId#(
+            IUserManager<TeamUserData> userManager,
+            I#ServiceName# service)
+        {
+            m_userManager = userManager;
+            m_service = service;
+            m_actionId = #ActionId#;
+        }
+        
+        public override async Task DoAction()
+        {
+            if (m_params != null)
+            {
+				if (m_accountId > 0)
+				{
+					var userData = m_userManager.GetUserData(m_accountId);
+					if (userData != null)
+					{
+						m_roleId = userData.RoleId;
+						m_teamId = userData.TeamId;
+					}
+				}
+
+#ReadParams#
+                var retData = await m_service.#MethodName#(#Params#);
+				#MapperReturn#
+                m_return = data;
+            }
+            await base.DoAction();
+        }
+    }
+}

@@ -38,7 +38,7 @@ namespace CommonLibs
     [AttributeUsage(AttributeTargets.Class)]
     public class WebApiAttribute : System.Attribute
     {
-        public string PrivKeyName = string.Empty;
+        public string RSAKeyName = string.Empty;
     }
 
     [AttributeUsage(AttributeTargets.Class)]

@@ -1,0 +1,19 @@
+﻿    
+		public async Task<ReturnData<#ReturnType#>> Submit#MethodName#Async(#MethodParams#)
+		{
+			ReturnData<#ReturnType#> retData = null;
+            if (m_client.CheckConnection())
+            {
+                var pars = new PackageParams();
+#WriteParams#
+                var pardata = pars.PopBuffer();
+                pars.Dispose();
+
+                var package = await m_client.SendAsync(#ActionId#, pardata);
+                retData = new ReturnData<#ReturnType#>((ErrorCodeEnum)package.ErrorCode);
+				if (package.MyError == ErrorCodeEnum.Success)
+					retData.Data = ProtoBufUtils.Deserialize<#ReturnType#>(package.Return);              
+            }
+            return retData;
+		}
+	

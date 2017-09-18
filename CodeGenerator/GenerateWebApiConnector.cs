@@ -255,6 +255,7 @@ namespace CodeGenerator
                             server_controller_method = server_controller_method.Replace("#MapperReturn#", mapperReturn);
                             server_controller_method = server_controller_method.Replace("#ParamsFromDic#", paramsFromDic);
                             server_controller_method = server_controller_method.Replace("#ValidDic#", ValidDic);
+                            server_controller_method = server_controller_method.Replace("#RSAKeyName#", webapiAttri.RSAKeyName);
 
                             //这个必须最后
                             server_controller_method = server_controller_method.Replace("#ReturnType#", returnTypeName);
@@ -272,6 +273,7 @@ namespace CodeGenerator
                                 WithReturnType = "ReturnData<" + returnTypeName + ">";
 
                             //client
+                            client_connector_method = client_connector_method.Replace("#RSAKeyName#", webapiAttri.RSAKeyName);
                             client_connector_method = client_connector_method.Replace("#ServerName#", m_project_name);
                             client_connector_method = client_connector_method.Replace("#ModelProject#", modelPrject);
                             client_connector_method = client_connector_method.Replace("#MethodName#", vMethodInfo.Name);
@@ -297,7 +299,6 @@ namespace CodeGenerator
                         
             //服务端Controller
             string server_controller_file = server_controller_template;
-            server_controller_file = server_controller_file.Replace("#PrivKeyName#", webapiAttri.PrivKeyName);
             server_controller_file = server_controller_file.Replace("#ControllerName#", controllerName);
             server_controller_file = server_controller_file.Replace("#ModelProject#", modelPrject);
             server_controller_file = server_controller_file.Replace("#Interface#", interfaceName);
