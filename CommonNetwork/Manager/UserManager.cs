@@ -15,6 +15,15 @@ namespace CommonNetwork
 
         object m_lock = new object();
 
+        public int GetSocketUserCount()
+        {
+            return m_useridBySocket.Count;
+        }
+        public int GetTotalUserCount()
+        {
+            return m_usersById.Count;
+        }
+
         public virtual T UpdateUser(WebSocket socket, int userId, UserTypeEnum userType, int roleId, string token, double expiresIn)
         {
             T data = default(T);
@@ -58,7 +67,7 @@ namespace CommonNetwork
                 if (m_useridBySocket.TryGetValue(handle, out id))
                 {
                     T data = null;
-                        m_usersById.TryRemove(id, out data);
+                    m_usersById.TryRemove(id, out data);
 
                     int tid = 0;
                     m_useridBySocket.TryRemove(handle, out tid);

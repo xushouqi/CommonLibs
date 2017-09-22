@@ -210,8 +210,10 @@ namespace CommonNetwork
                 var userData = m_userManager.GetUserData(socket);
                 if (userData != null)
                 {
+                    //移除下发消息
                     m_pushManager.RemovePushAction(userData);
                 }
+                //移除user
                 int id = m_userManager.RemoveUser(socket);
                 m_logService.LogInformation(string.Format("OnHandleClose: {0}, uid={1}", socket.State, id));
                 socket.Abort();
