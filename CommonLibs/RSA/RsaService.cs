@@ -204,7 +204,7 @@ namespace CommonLibs
             return DecryptToString(input, keyName);
         }
 
-        private static RSA CreateRsaFromPrivateKey(string privateKey)
+        public static RSA CreateRsaFromPrivateKey(string privateKey)
         {
             var privateKeyBits = System.Convert.FromBase64String(privateKey);
             var rsa = RSA.Create();
@@ -282,7 +282,7 @@ namespace CommonLibs
             return count;
         }
 
-        private static RSA CreateRsaFromPublicKey(string publicKeyString)
+        public static RSA CreateRsaFromPublicKey(string publicKeyString)
         {
             byte[] SeqOID = { 0x30, 0x0D, 0x06, 0x09, 0x2A, 0x86, 0x48, 0x86, 0xF7, 0x0D, 0x01, 0x01, 0x01, 0x05, 0x00 };
             byte[] x509key;
