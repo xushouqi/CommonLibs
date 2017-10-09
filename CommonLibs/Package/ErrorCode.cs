@@ -13,6 +13,8 @@ namespace CommonLibs
         WrongTokenOrTimeout = 1001,
         NotExists,
         UnAuthorized,
+        Expired,
+        NotValid,
 
         WrongPassword,
         InvalidDataformat,
@@ -25,7 +27,6 @@ namespace CommonLibs
         AlreadyExists,
         HasSameValue,
         NoTeam,
-        NotValidSchedule,
 
         CreateLeagueFail,
         CreateTeamFail,
@@ -42,6 +43,7 @@ namespace CommonLibs
         PlayerNotOnListing,
 
         TeamGradeNotValid,
+        NotValidSchedule,
 
         //UserNameOrIDCodeExists = 1001,
         //WrongUserOrPassword,

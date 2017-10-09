@@ -36,16 +36,18 @@ namespace CommonServices
             {
                 context.Fail(); // 显式的声明验证失败
             }
-
-            // 检查 jti 是否在黑名单
-            var tokenExists = await _redisClient.GetDatabase("JWT").KeyExistsAsync(jti);
-            if (tokenExists)
-            {
-                context.Fail();
-            }
             else
             {
-                context.Succeed(requirement); // 显式的声明验证成功
+                // 检查 jti 是否在黑名单
+                var tokenExists = await _redisClient.GetDatabase("JWT").KeyExistsAsync(jti);
+                if (tokenExists)
+                {
+                    context.Fail();
+                }
+                else
+                {
+                    context.Succeed(requirement); // 显式的声明验证成功
+                }
             }
         }
     }

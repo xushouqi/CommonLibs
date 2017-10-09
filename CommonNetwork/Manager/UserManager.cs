@@ -24,7 +24,7 @@ namespace CommonNetwork
             return m_usersById.Count;
         }
 
-        public virtual T UpdateUser(WebSocket socket, int userId, UserTypeEnum userType, int roleId, string token, double expiresIn)
+        public virtual T UpdateUser(WebSocket socket, int userId, UserTypeEnum userType, int roleId, string jti, double expiresIn)
         {
             T data = default(T);
             if (socket != null && userId > 0)
@@ -39,7 +39,7 @@ namespace CommonNetwork
                         data.Type = userType;
                         data.RoleId = roleId;
                         data.SocketHandle = handle;
-                        data.Token = token;
+                        data.Jti = jti;
                         data.ExpireTime = DateTime.Now.AddSeconds(expiresIn);
                     }
                     else
@@ -49,7 +49,7 @@ namespace CommonNetwork
                         data.Type = userType;
                         data.RoleId = roleId;
                         data.SocketHandle = handle;
-                        data.Token = token;
+                        data.Jti = jti;
                         data.ExpireTime = DateTime.Now.AddSeconds(expiresIn);
                         m_usersById.AddOrUpdate(userId, data, (key, oldValue) => data);
                     }

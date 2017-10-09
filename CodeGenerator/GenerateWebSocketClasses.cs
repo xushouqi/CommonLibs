@@ -22,7 +22,7 @@ namespace CodeGenerator
             m_modelAssembly = modelAssembly;
         }
 
-        public static void GenerateFromService(Type[] types)
+        public static void GenerateFromService(Type[] types, bool genClient)
         {
             string regModuleStr = "";
             string regActionIdByType = "";
@@ -97,7 +97,7 @@ namespace CodeGenerator
             CodeCommon.WriteFile(pushFile, pushmanager);
 
             //NetworkClient
-            if (!string.IsNullOrEmpty(m_client_path))
+            if (!string.IsNullOrEmpty(m_client_path) && genClient)
             {
                 string networkd_client = CodeCommon.GetTemplate(m_template_path, "NetworkClient.txt");
                 networkd_client = networkd_client.Replace("#DefineClient#", defineClient);

@@ -57,10 +57,11 @@ namespace CommonNetwork
             var result = ProtoBufUtils.Serialize(m_package);
             return result;
         }
-        public virtual byte[] GetUnAuthorizedData()
+        public virtual byte[] GetUnAuthorizedData(WebPackage package)
         {
-            m_package.ErrorCode = (int)ErrorCodeEnum.UnAuthorized;
-            var result = ProtoBufUtils.Serialize(m_package);
+            m_package = package;
+            package.ErrorCode = (int)ErrorCodeEnum.UnAuthorized;
+            var result = ProtoBufUtils.Serialize(package);
             return result;
         }
 

@@ -12,10 +12,10 @@ using CommonLibs;
 
 namespace CommonNetwork
 {
-    public class SocketHandler<T> where T : UserData
+    public class WebSocketHandler<T> where T : UserData
     {
         private readonly RequestDelegate m_next;
-        private readonly ILogger<SocketHandler<T>> m_logService;
+        private readonly ILogger<WebSocketHandler<T>> m_logService;
         private readonly IUserManager<T> m_userManager;
         private readonly IPushManager m_pushManager;
         private IServiceProvider m_services;
@@ -25,10 +25,10 @@ namespace CommonNetwork
 
         private readonly string m_project_name = string.Empty;
 
-        public SocketHandler(RequestDelegate next,
+        public WebSocketHandler(RequestDelegate next,
             IUserManager<T> userManager,
             IPushManager pushManager,
-            ILogger<SocketHandler<T>> logService
+            ILogger<WebSocketHandler<T>> logService
             )
         {
             m_assembly = Assembly.GetEntryAssembly();
@@ -44,44 +44,27 @@ namespace CommonNetwork
         {
             if (context.WebSockets.IsWebSocketRequest)
             {
-                m_socket = await context.WebSockets.AcceptWebSocketAsync();
+                var socket = await context.WebSockets.AcceptWebSocketAsync();
+                m_socket = socket;
                 m_services = context.RequestServices;
                 
-                m_logService.LogInformation(string.Format("SocketHandler Work Start, {0}", Thread.CurrentThread.ManagedThreadId));
-                await Work(m_socket);
-                m_logService.LogInformation(string.Format("SocketHandler Work Finish. {0}", Thread.CurrentThread.ManagedThreadId));
-            }
-            else
-                await m_next.Invoke(context);
-        }
+                m_logService.LogInformation("SocketHandler Work Start, {0}", Thread.CurrentThread.ManagedThreadId);
 
-        private async void PushToClient(WebPackage package)
-        {
-            var result = ProtoBufUtils.Serialize(package);
-            var ia = new ArraySegment<byte>(result);
+                var buffer = new byte[BufferSize];
+                var seg = new ArraySegment<byte>(buffer);
 
-            m_logService.LogInformation(string.Format("PushToClient.Send {0}, data={1}", Thread.CurrentThread.ManagedThreadId, ia.Count));
-            await Task.Run(() => SendAsync(m_socket, ia));
-        }
-        private async Task SendAsync(WebSocket socket, ArraySegment<byte> data)
-        {
-            await socket.SendAsync(data, WebSocketMessageType.Binary, true, new CancellationTokenSource(60000).Token);
-        }
-
-        private async Task Work(WebSocket socket)
-        {
-            var buffer = new byte[BufferSize];
-            var seg = new ArraySegment<byte>(buffer);
-
-            try
-            {
-                while (socket.State == WebSocketState.Open)
+                try
                 {
-                    //等待客户端提交数据
-                    var incoming = await socket.ReceiveAsync(seg, CancellationToken.None);
-                    if (incoming.Count > 0)
+                    while (socket.State == WebSocketState.Open)
                     {
-                        m_logService.LogInformation(string.Format("SocketHandler ReceiveAsync incoming.Count={0}, Thread={1}", incoming.Count, Thread.CurrentThread.ManagedThreadId));
+                        WebSocketReceiveResult incoming = null;
+                        //等待客户端提交数据
+                        //incoming = await socket.ReceiveAsync(seg, CancellationToken.None);
+                        do
+                        {
+                            incoming = await socket.ReceiveAsync(seg, CancellationToken.None).ConfigureAwait(false);
+                        }
+                        while (!incoming.EndOfMessage);
 
                         if (incoming.MessageType == WebSocketMessageType.Binary)
                         {
@@ -91,6 +74,7 @@ namespace CommonNetwork
                             {
                                 //调用对应的服务
                                 var actionName = string.Concat(m_project_name, ".Actions.Action", package.ActionId);
+                                m_logService.LogInformation("SocketHandler ReceiveAsync actionName={0}, Thread={1}", actionName, Thread.CurrentThread.ManagedThreadId);
 
                                 try
                                 {
@@ -121,7 +105,7 @@ namespace CommonNetwork
                                                     validGo = user != null && user.Type >= attri.AuthPolicy;
                                             }
 
-                                            if (uid > 0 || (attri !=null && attri.AuthPolicy == UserTypeEnum.None))
+                                            if (uid > 0 || (attri != null && attri.AuthPolicy == UserTypeEnum.None))
                                             {
                                                 byte[] result;
                                                 if (validGo)
@@ -136,7 +120,7 @@ namespace CommonNetwork
                                                     result = action.GetResponseData();
                                                 }
                                                 else
-                                                    result = action.GetUnAuthorizedData();
+                                                    result = action.GetUnAuthorizedData(package);
 
                                                 var ia = new ArraySegment<byte>(result);
                                                 //回包
@@ -147,60 +131,75 @@ namespace CommonNetwork
                                                 await action.AfterAction();
                                             }
                                             else
-                                                m_logService.LogError(string.Format("Uid NOT Found!!! {0}", actionName));
+                                                m_logService.LogError("Uid NOT Found!!! {0}", actionName);
                                         }
                                         else
-                                            m_logService.LogError(string.Format("{0} NOT Found!!!", actionName));
+                                            m_logService.LogError("{0} NOT Found!!!", actionName);
                                     }
                                     else
-                                        m_logService.LogError(string.Format("{0} NOT Found!!!", actionName));
+                                        m_logService.LogError("{0} NOT Found!!!", actionName);
                                 }
                                 catch (WebSocketException e)
                                 {
-                                    m_logService.LogError(string.Format("SocketHandle.WebSocketException: {0}", e.Message));
+                                    m_logService.LogError("SocketHandle.WebSocketException: {0}", e.Message);
                                 }
                                 catch (Exception e)
                                 {
-                                    m_logService.LogError(string.Format("SocketHandle.Exception: {0}", e.Message));
-                                    m_logService.LogError(string.Format("SocketHandle.Exception: {0}", e.StackTrace));
+                                    m_logService.LogError("SocketHandle.Exception: {0}\n{1}", e.Message, e.StackTrace);
                                 }
                             }
                         }
                         else if (incoming.MessageType == WebSocketMessageType.Text)
                         {
                             string msg = System.Text.Encoding.UTF8.GetString(seg.Array, 0, incoming.Count);
-                            m_logService.LogError(string.Format("Receive Text: {0}", msg));
+                            m_logService.LogError("Receive Text: {0}", msg);
                         }
                         else if (incoming.MessageType == WebSocketMessageType.Close)
                         {
                             OnHandleClose(socket);
                         }
                     }
-                }
 
-                if (socket.State == WebSocketState.Aborted)
-                {
-                    // Handle aborted
+                    if (socket.State == WebSocketState.Aborted)
+                    {
+                        // Handle aborted
+                    }
+                    else if (socket.State == WebSocketState.Closed)
+                    {
+                        OnHandleClose(socket);
+                    }
+                    else if (socket.State == WebSocketState.CloseReceived)
+                    {
+                        OnHandleClose(socket);
+                    }
+                    else if (socket.State == WebSocketState.CloseSent)
+                    {
+                    }
                 }
-                else if (socket.State == WebSocketState.Closed)
+                catch (Exception e)
                 {
+                    string msg = e.Message;
+                    m_logService.LogError("Socket Error: {0}", msg);
+
                     OnHandleClose(socket);
                 }
-                else if (socket.State == WebSocketState.CloseReceived)
-                {
-                    OnHandleClose(socket);
-                }
-                else if (socket.State == WebSocketState.CloseSent)
-                {
-                }
+                m_logService.LogInformation("SocketHandler Work Finish. {0}", Thread.CurrentThread.ManagedThreadId);
             }
-            catch (Exception e)
-            {
-                string msg = e.Message;
-                m_logService.LogError(string.Format("Socket Error: {0}", msg));
+            else
+                await m_next.Invoke(context);
+        }
+        
+        private async void PushToClient(WebPackage package)
+        {
+            var result = ProtoBufUtils.Serialize(package);
+            var ia = new ArraySegment<byte>(result);
 
-                OnHandleClose(socket);
-            }
+            m_logService.LogInformation("PushToClient.Send {0}, data={1}", Thread.CurrentThread.ManagedThreadId, ia.Count);
+            await Task.Run(() => SendAsync(m_socket, ia));
+        }
+        private async Task SendAsync(WebSocket socket, ArraySegment<byte> data)
+        {
+            await socket.SendAsync(data, WebSocketMessageType.Binary, true, new CancellationTokenSource(60000).Token);
         }
 
         void OnHandleClose(WebSocket socket)
@@ -215,7 +214,7 @@ namespace CommonNetwork
                 }
                 //移除user
                 int id = m_userManager.RemoveUser(socket);
-                m_logService.LogInformation(string.Format("OnHandleClose: {0}, uid={1}", socket.State, id));
+                m_logService.LogInformation("OnHandleClose: {0}, uid={1}", socket.State, id);
                 socket.Abort();
             }
         }

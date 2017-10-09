@@ -14,7 +14,6 @@ namespace CommonLibs
         TEntity Find(int id);
         TEntity Find(string key);
         bool Any(int id);
-        bool Any(string key);
         Task<bool> AnyAsync(Expression<Func<TEntity, bool>> predicate);
         Task<TEntity> FirstOrDefaultAsync(Expression<Func<TEntity, bool>> predicate, CancellationToken token = default(CancellationToken));
         Task<TEntity> MaxAsync<TKey>(Expression<Func<TEntity, bool>> where, Expression<Func<TEntity, TKey>> order);

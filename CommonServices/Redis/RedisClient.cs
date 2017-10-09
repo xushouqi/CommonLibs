@@ -10,6 +10,7 @@ namespace CommonServices
     {
         private RedisOptions _options;
         private ConcurrentDictionary<string, ConnectionMultiplexer> _connections;
+        private RedisServer m_defaultServer = null;
 
         public RedisClient(IOptions<RedisOptions> config)
         {
@@ -17,16 +18,28 @@ namespace CommonServices
             _connections = new ConcurrentDictionary<string, ConnectionMultiplexer>();
         }
         
-        private ConnectionMultiplexer GetConnect(string instanceName)
+        private RedisServer GetRedisServer(string instanceName)
         {
-            if (string.IsNullOrEmpty(instanceName) && _options.RedisServers.Count > 0)
+            RedisServer redisServer = null;
+            if (string.IsNullOrEmpty(instanceName))
             {
-                instanceName = _options.RedisServers.Keys.GetEnumerator().Current;
+                if (m_defaultServer == null && _options.RedisServers.Count > 0)
+                {
+                    RedisServer[] servers = new RedisServer[_options.RedisServers.Count];
+                    _options.RedisServers.Values.CopyTo(servers, 0);
+                    m_defaultServer = servers[0];
+                }
+                redisServer = m_defaultServer;
             }
-            if (!_options.RedisServers.TryGetValue(instanceName, out var redisServer))
+            else if (!_options.RedisServers.TryGetValue(instanceName, out redisServer))
             {
                 throw new ArgumentNullException($"Can't find redis server: {instanceName}!!!");
             }
+            return redisServer;
+        }
+        private ConnectionMultiplexer GetConnect(string instanceName)
+        {
+            var redisServer = GetRedisServer(instanceName);
             return _connections.GetOrAdd(instanceName, p => ConnectionMultiplexer.Connect(redisServer.Connection));
         }
         
@@ -34,14 +47,7 @@ namespace CommonServices
         {
             if (!db.HasValue)
             {
-                if (string.IsNullOrEmpty(instanceName) && _options.RedisServers.Count > 0)
-                {
-                    instanceName = _options.RedisServers.Keys.GetEnumerator().Current;
-                }
-                if (!_options.RedisServers.TryGetValue(instanceName, out var redisServer))
-                {
-                    throw new ArgumentNullException($"Can't find redis server: {instanceName}!!!");
-                }
+                var redisServer = GetRedisServer(instanceName);
                 if (redisServer != null)
                     db = redisServer.DefaultDatabase;
                 else
@@ -52,14 +58,7 @@ namespace CommonServices
 
         public IServer GetServer(string instanceName = "", int endPointsIndex = 0)
         {
-            if (string.IsNullOrEmpty(instanceName) && _options.RedisServers.Count > 0)
-            {
-                instanceName = _options.RedisServers.Keys.GetEnumerator().Current;
-            }
-            if (!_options.RedisServers.TryGetValue(instanceName, out var redisServer))
-            {
-                throw new ArgumentNullException($"Can't find redis server: {instanceName}!!!");
-            }
+            var redisServer = GetRedisServer(instanceName);
             var confOption = ConfigurationOptions.Parse((string)redisServer.Connection);
             return GetConnect(instanceName).GetServer(confOption.EndPoints[endPointsIndex]);
         }

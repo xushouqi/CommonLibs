@@ -10,7 +10,7 @@ namespace CommonNetwork
         void Submit(WebSocket socket, UserData userData, WebPackage package);
         Task DoAction();
         byte[] GetResponseData();
-        byte[] GetUnAuthorizedData();
+        byte[] GetUnAuthorizedData(WebPackage package);
         Task AfterAction();
     }
 }

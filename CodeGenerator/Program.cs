@@ -11,12 +11,16 @@ namespace CodeGenerator
 {
     public class MyArgs
     {
+        [ArgShortcut("-c"), ArgDescription("Generate client")]
+        public bool ClientApi { get; set; } = false;
+
         [ArgRequired(PromptIfMissing = true)]
-        [ArgPosition(0)]
+        [ArgShortcut("-t")]
         public string TemplatePath { get; set; }
 
-        [ArgPosition(1)]
+        //[ArgPosition(2)]
         [ArgRequired(PromptIfMissing = true)]
+        [ArgShortcut("-d")]
         public string TargetDll { get; set; }
     }
 
@@ -28,8 +32,8 @@ namespace CodeGenerator
 
             try
             {
-                var parsed = Args.Parse<MyArgs>(args);
-                Console.WriteLine("TemplatePath={0}, TargetDll={1}", parsed.TemplatePath, parsed.TargetDll);
+                var arguments = Args.Parse<MyArgs>(args);
+                Console.WriteLine("TemplatePath={0}, TargetDll={1}", arguments.TemplatePath, arguments.TargetDll);
 
                 Process pInfo = Process.GetCurrentProcess();
                 //运行目录
@@ -46,13 +50,13 @@ namespace CodeGenerator
                     solutionPath = runPath.Substring(0, lastOfPath);
 
                 //模版地址
-                string template_path = parsed.TemplatePath;
+                string template_path = arguments.TemplatePath;
                 if (!template_path.EndsWith(@"\"))
                     template_path += @"\";
                 Console.WriteLine("template_path={0}", template_path);
 
                 //目标项目文件
-                string dllfile = parsed.TargetDll;
+                string dllfile = arguments.TargetDll;
 
                 int lastOfP = dllfile.LastIndexOf(@"\");
                 //dll目录
@@ -124,14 +128,14 @@ namespace CodeGenerator
                             client_path = solutionPath + @"\ClientApiConnector\WebApi\" + project_name + @"\";
 
                             GenerateWebApiConnector.InitPath(modelsAssembly, template_path, project_name, server_path, client_path);
-                            GenerateWebApiConnector.GenerateFromService(myType);
+                            GenerateWebApiConnector.GenerateFromService(myType, arguments.ClientApi);
                         }
                         if (myType.GetTypeInfo().IsDefined(typeof(WebSocketAttribute), false))
                         {
                             client_path = solutionPath + @"\ClientApiConnector\WebSocket\" + project_name + @"\";
 
                             GenerateWebSocketClient.InitPath(modelsAssembly, template_path, project_name, server_path, client_path);
-                            GenerateWebSocketClient.GenerateFromService(myType);
+                            GenerateWebSocketClient.GenerateFromService(myType, arguments.ClientApi);
 
                             socketTypeList.Add(myType);
                         }
@@ -143,7 +147,7 @@ namespace CodeGenerator
                     client_path = "";
 
                     GenerateWebSocketClasses.InitPath(modelsAssembly, template_path, project_name, server_path, client_path);
-                    GenerateWebSocketClasses.GenerateFromService(socketTypeList.ToArray());
+                    GenerateWebSocketClasses.GenerateFromService(socketTypeList.ToArray(), arguments.ClientApi);
                 }
 
 

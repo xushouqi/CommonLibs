@@ -27,12 +27,12 @@ namespace CodeGenerator
             m_modelAssembly = modelAssembly;
         }
 
-        public static void GenerateFromService<T>()
+        public static void GenerateFromService<T>(bool genClient)
         {
-            GenerateFromService(typeof(T));
+            GenerateFromService(typeof(T), genClient);
         }
 
-        public static void GenerateFromService(System.Type vType)
+        public static void GenerateFromService(System.Type vType, bool genClient)
         {
             var webapiAttri = (WebApiAttribute)vType.GetTypeInfo().GetCustomAttribute(typeof(WebApiAttribute), false);
 

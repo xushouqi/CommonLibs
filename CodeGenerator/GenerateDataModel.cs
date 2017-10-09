@@ -128,16 +128,16 @@ namespace CodeGenerator
 
 
             //cache subscriber
-            string subscriber_class = CodeCommon.GetTemplate(m_template_path, "ServerCacheSubscriber.txt");
-            if (!string.IsNullOrEmpty(subscriber_class))
-            {
-                subscriber_class = subscriber_class.Replace("#ModelProject#", modelPrject);
-                subscriber_class = subscriber_class.Replace("#ProjectName#", m_project_name);
-                subscriber_class = subscriber_class.Replace("#SwitchCacheClient#", switchCache);
+            //string subscriber_class = CodeCommon.GetTemplate(m_template_path, "ServerCacheSubscriber.txt");
+            //if (!string.IsNullOrEmpty(subscriber_class))
+            //{
+            //    subscriber_class = subscriber_class.Replace("#ModelProject#", modelPrject);
+            //    subscriber_class = subscriber_class.Replace("#ProjectName#", m_project_name);
+            //    subscriber_class = subscriber_class.Replace("#SwitchCacheClient#", switchCache);
 
-                fileName = m_server_path + @"\Data\CacheSubscriber.cs";
-                CodeCommon.WriteFile(fileName, subscriber_class);
-            }
+            //    fileName = m_server_path + @"\Data\CacheSubscriber.cs";
+            //    CodeCommon.WriteFile(fileName, subscriber_class);
+            //}
         }
     }
 }

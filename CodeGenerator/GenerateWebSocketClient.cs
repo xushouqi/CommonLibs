@@ -26,12 +26,12 @@ namespace CodeGenerator
             m_modelAssembly = modelAssembly;
         }
 
-        public static void GenerateFromService<T>()
+        public static void GenerateFromService<T>(bool genClient)
         {
-            GenerateFromService(typeof(T));
+            GenerateFromService(typeof(T), genClient);
         }
 
-        public static void GenerateFromService(System.Type vType)
+        public static void GenerateFromService(System.Type vType, bool genClient)
         {
             m_service_name = vType.Name;
 
@@ -217,7 +217,7 @@ namespace CodeGenerator
             }
 
             //客户端submit接口
-            if (!string.IsNullOrEmpty(m_client_path))
+            if (!string.IsNullOrEmpty(m_client_path) && genClient)
             {
                 string client_class = clientTemplate;
                 client_class = client_class.Replace("#ProjectName#", m_project_name);

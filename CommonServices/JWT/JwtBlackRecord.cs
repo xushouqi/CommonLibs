@@ -11,9 +11,9 @@ namespace CommonServices
         {
             return 0;
         }
-        public override string GetKey()
+        public override void SetId(int id)
         {
-            return Jti;
+            
         }
         public override DateTime TryUpdateTime()
         {

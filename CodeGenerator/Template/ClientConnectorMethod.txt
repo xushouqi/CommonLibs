@@ -3,7 +3,7 @@
         /// </summary>
         public static async Task<#WithReturnType#> #MethodName#Async(#MethodParams#)
         {
-            var content = new FormUrlEncodedContent(new Dictionary<string, string>()
+            var content = new BigFormUrlEncodedContent(new Dictionary<string, string>()
             {
 				#DicParams#
             });

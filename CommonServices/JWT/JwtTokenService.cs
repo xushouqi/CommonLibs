@@ -35,16 +35,27 @@ namespace CommonServices
                 throw new ArgumentException("Must be a non-zero TimeSpan", nameof(JwtIssuerOptions.ValidFor));
             if (options.SigningCredentials == null)
                 throw new ArgumentNullException(nameof(JwtIssuerOptions.SigningCredentials));
-            if (options.JtiGenerator == null)
-                throw new ArgumentNullException(nameof(JwtIssuerOptions.JtiGenerator));
+            //if (options.JtiGenerator == null)
+            //    throw new ArgumentNullException(nameof(JwtIssuerOptions.JtiGenerator));
+        }
+
+        public int GetJtiRndNumber(string jti)
+        {
+            byte[] buffer = System.Text.Encoding.UTF8.GetBytes(jti);
+            int iSeed = BitConverter.ToInt32(buffer, 0);
+            var number = new Random(iSeed).Next(100000000, 1000000000);
+            return number;
         }
 
         public async Task<string> GenerateToken(int userId, string authType)
         {
+            //生成随机数
+            var jti = Guid.NewGuid().ToString();
+
             var claims = new[]{
                         new Claim(ClaimTypes.NameIdentifier, userId.ToString()),
                         new Claim(ClaimTypes.Role, authType),
-                        new Claim(JwtRegisteredClaimNames.Jti, await _jwtOptions.JtiGenerator()),
+                        new Claim(JwtRegisteredClaimNames.Jti, jti),
                         new Claim(JwtRegisteredClaimNames.Iat, MathUtils.ToUnixEpochDate(_jwtOptions.IssueAt).ToString(), ClaimValueTypes.Integer64),
                     };
 
@@ -58,7 +69,7 @@ namespace CommonServices
                     signingCredentials: _jwtOptions.SigningCredentials
                 );
             string token = new JwtSecurityTokenHandler().WriteToken(jwt);
-            return token;
+            return await Task.FromResult(token);
         }
 
         public JwtIssuerOptions GetJwtOptions()
