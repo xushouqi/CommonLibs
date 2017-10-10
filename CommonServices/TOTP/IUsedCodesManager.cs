@@ -1,6 +1,7 @@
 ﻿using System;
 
-namespace TwoStepsAuthenticator {
+namespace CommonServices.TOTP
+{
 
     /// <summary>
     /// Manages used code to prevent repeated use of a code.

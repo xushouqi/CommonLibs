@@ -33,7 +33,7 @@ namespace CommonServices
         private int m_sequenceId;
         private ContainerStateEnum m_state = ContainerStateEnum.None;
 
-        public bool AllInCache = false;
+        public bool AllInMem = false;
 
         private object m_lock_data;
         private DateTime m_lastSaveDbTime;
@@ -60,7 +60,7 @@ namespace CommonServices
             DataModelsAttribute attrib = (DataModelsAttribute)type.GetTypeInfo().GetCustomAttribute(typeof(DataModelsAttribute), false);
             if (attrib != null)
             {
-                AllInCache = attrib.AllInCache;
+                AllInMem = attrib.AllInMem;
             }
 
             Task.Run(TrySaveDb);
@@ -73,7 +73,7 @@ namespace CommonServices
         /// </summary>
         protected void Initial()
         {
-            if (AllInCache)
+            if (AllInMem)
             {
                 m_sequenceId = 0;
                 m_context.Set<T>()
@@ -93,6 +93,11 @@ namespace CommonServices
                     m_context.Set<T>().MaxAsync(t => t.GetId()).GetAwaiter().GetResult() : 0;
             }
             m_state = ContainerStateEnum.Ready;
+        }
+
+        void IDisposable.Dispose()
+        {
+            DoSaveDb().Wait();
         }
 
         public void Reload()
@@ -262,11 +267,6 @@ namespace CommonServices
             }
         }
 
-        void Dispose()
-        {
-            DoSaveDb().Wait();
-        }
-
         public T Refresh(int id)
         {
             CheckReady();
@@ -288,7 +288,7 @@ namespace CommonServices
         public List<T> WhereToList<TKey>(Func<T, bool> predicate)
         {
             List<T> datalist = null;
-            if (AllInCache)
+            if (AllInMem)
             {
                 lock (m_lock_data)
                 {
@@ -308,7 +308,7 @@ namespace CommonServices
         }
         public T FirstOrDefault(Func<T, bool> predicate)
         {
-            if (AllInCache)
+            if (AllInMem)
             {
                 var data = m_cacheStruct.FirstOrDefault((item) => predicate(item.Value));
                 return data.Value ?? default(T);
@@ -320,7 +320,7 @@ namespace CommonServices
         }
         public bool Any(Func<T, bool> predicate)
         {
-            if (AllInCache)
+            if (AllInMem)
             {
                 return m_cacheStruct.Any((item) => predicate(item.Value));
             }
@@ -330,9 +330,5 @@ namespace CommonServices
             }
         }
 
-        void IDisposable.Dispose()
-        {
-            throw new NotImplementedException();
-        }
     }
 }

@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace TwoStepsAuthenticator
+namespace CommonServices.TOTP
 {
     // This class was found just here : http://stackoverflow.com/questions/641361/base32-decoding
     // This file is under Creative Commons http://creativecommons.org/licenses/by-sa/2.5/

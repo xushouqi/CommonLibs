@@ -49,7 +49,7 @@ namespace CommonLibs
     [AttributeUsage(AttributeTargets.Class)]
     public class DataModelsAttribute : System.Attribute
     {
-        public bool AllInCache = false;
+        public bool AllInMem = false;
     }
 
     //[AttributeUsage(AttributeTargets.Class)]

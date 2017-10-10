@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Threading;
 
-namespace TwoStepsAuthenticator
+namespace CommonServices.TOTP
 {
     public class UsedCodesManager : IUsedCodesManager
     {

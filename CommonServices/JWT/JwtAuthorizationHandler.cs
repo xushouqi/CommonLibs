@@ -38,15 +38,15 @@ namespace CommonServices
             }
             else
             {
-                // 检查 jti 是否在黑名单
+                // 检查 jti 是否在数据库里
                 var tokenExists = await _redisClient.GetDatabase("JWT").KeyExistsAsync(jti);
                 if (tokenExists)
                 {
-                    context.Fail();
+                    context.Succeed(requirement); // 显式的声明验证成功
                 }
                 else
                 {
-                    context.Succeed(requirement); // 显式的声明验证成功
+                    context.Fail();
                 }
             }
         }

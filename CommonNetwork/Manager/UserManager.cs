@@ -27,12 +27,16 @@ namespace CommonNetwork
         public virtual T UpdateUser(WebSocket socket, int userId, UserTypeEnum userType, int roleId, string jti, double expiresIn)
         {
             T data = default(T);
-            if (socket != null && userId > 0)
+            if (userId > 0)
             {
                 lock (m_lock)
                 {
-                    int handle = socket.GetHashCode();
-                    m_useridBySocket.AddOrUpdate(handle, userId, (key, oldValue) => userId);
+                    int handle = -1;
+                    if (socket != null)
+                    {
+                        handle = socket.GetHashCode();
+                        m_useridBySocket.AddOrUpdate(handle, userId, (key, oldValue) => userId);
+                    }
 
                     if (m_usersById.TryGetValue(userId, out data))
                     {
@@ -51,7 +55,13 @@ namespace CommonNetwork
                         data.SocketHandle = handle;
                         data.Jti = jti;
                         data.ExpireTime = DateTime.Now.AddSeconds(expiresIn);
-                        m_usersById.AddOrUpdate(userId, data, (key, oldValue) => data);
+                        m_usersById.TryAdd(userId, data);
+
+                        var explist = m_usersById.Where(t => t.Value.ExpireTime > DateTime.Now).ToArray();
+                        for (int i = 0; i < explist.Length; i++)
+                        {
+                            m_usersById.TryRemove(explist[i].Key, out T value);
+                        }
                     }
                 }
             }
@@ -98,7 +108,7 @@ namespace CommonNetwork
         public bool ValidSocket(WebSocket socket)
         {
             int handle = socket.GetHashCode();
-            return m_useridBySocket.ContainsKey(handle);
+            return handle >=0 && m_useridBySocket.ContainsKey(handle);
         }
 
         public virtual T GetUserData(WebSocket socket)

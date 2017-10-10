@@ -1,7 +1,6 @@
 ﻿using System;
-using CommonLibs;
 
-namespace CommonNetwork
+namespace CommonLibs
 {
 
     public class UserData

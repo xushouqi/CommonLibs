@@ -5,7 +5,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace TwoStepsAuthenticator
+namespace CommonServices.TOTP
 {
     public abstract class Authenticator
     {
@@ -14,8 +14,8 @@ namespace TwoStepsAuthenticator
 #else
         private static readonly RNGCryptoServiceProvider Random = new RNGCryptoServiceProvider();
 #endif
-        private static readonly string AvailableKeyChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
-        //private static readonly string AvailableKeyChars = "123456789";
+        //private static readonly string AvailableKeyChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+        private static readonly string AvailableKeyChars = "123456789";
 
         public static string GenerateKey(int keyLength = 16)
         {
@@ -37,7 +37,8 @@ namespace TwoStepsAuthenticator
                 chlg >>= 8;
             }
 
-            var key = Base32Encoding.ToBytes(secret);
+            //var key = Base32Encoding.ToBytes(secret);
+            var key = System.Text.Encoding.UTF8.GetBytes(secret);
             for (int i = secret.Length; i < key.Length; i++)
             {
                 key[i] = 0;
