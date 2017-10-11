@@ -8,7 +8,7 @@ using CommonLibs;
 
 namespace CommonServices.Caching
 {
-    public interface ICacheClient<T> : IDisposable where T: Entity
+    public interface ICacheClient<T> : IDisposable where T: Entity<int>
     {
         Task<int> RemoveAllAsync(IEnumerable<string> keys = null);
         Task<int> RemoveByPrefixAsync(string prefix);

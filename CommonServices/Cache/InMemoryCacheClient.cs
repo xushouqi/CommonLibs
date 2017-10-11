@@ -12,7 +12,7 @@ using CommonLibs;
 
 namespace CommonServices.Caching
 {
-    public class InMemoryCacheClient<T> : MaintenanceBase, ICacheClient<T> where T : Entity
+    public class InMemoryCacheClient<T> : MaintenanceBase, ICacheClient<T> where T : Entity<int>
     {
         private readonly ConcurrentDictionary<string, CacheEntry<T>> _memory;
         //private readonly ConcurrentDictionary<string, CacheEntry<ICollection<T>>> _memorySets;
@@ -608,7 +608,7 @@ namespace CommonServices.Caching
         }
     }
 
-    public class EntityExpiredEventArgs<T> : EventArgs where T : Entity
+    public class EntityExpiredEventArgs<T> : EventArgs where T : Entity<int>
     {
         public InMemoryCacheClient<T> Client { get; set; }
         public string Key { get; set; }

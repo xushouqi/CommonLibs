@@ -14,7 +14,7 @@
 //{
 //    //public interface IHybridCacheClient : ICacheClient { }
 
-//    public class HybridCacheClient<T> : ICacheClient<T> where T : Entity
+//    public class HybridCacheClient<T> : ICacheClient<T> where T : Entity<int>
 //    {
 //        //protected readonly ICacheClient<T> _distributedCache;
 //        private readonly InMemoryCacheClient<T> _localCache;

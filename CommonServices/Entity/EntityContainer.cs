@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using CommonLibs;
 using Microsoft.EntityFrameworkCore;
 using System.Threading.Tasks;
+using StackExchange.Redis;
 
 namespace CommonServices
 {
@@ -17,51 +18,50 @@ namespace CommonServices
         Ready,
     }
 
-    public  class EntityContainer<T, TContext> : IDisposable where T: Entity where TContext : DbContext
+    public  class EntityContainer<TKey, TValue, TContext> : IDisposable where TValue: Entity<TKey> where TContext: DbContext
     {
-        private readonly RedisClient m_redisClient;
+        //private readonly RedisClient m_redisClient;
+        private readonly IDatabase m_redisDb;
         private readonly ILogger m_logger;
         private readonly TContext m_context;
 
-        private readonly ConcurrentDictionary<int, T> m_cacheStruct;
-        //private readonly ConcurrentDictionary<int, T> m_addDb;
-        private readonly ConcurrentDictionary<int, T> m_updateDb;
-        private readonly ConcurrentBag<T> m_waitToDb;
-        //private readonly ConcurrentDictionary<int, T> m_removeDb;
+        //private readonly ConcurrentDictionary<int, TValue> m_cacheStruct;
+        private readonly SizeLimitedCache<TKey, TValue> m_cacheStruct;
+        private readonly ConcurrentDictionary<TKey, TValue> m_updateDb;
 
         //自增的ID
         private int m_sequenceId;
         private ContainerStateEnum m_state = ContainerStateEnum.None;
 
-        public bool AllInMem = false;
+        public DataModelsAttribute DataAttribs;
 
         private object m_lock_data;
         private DateTime m_lastSaveDbTime;
 
         private readonly int MinToDbCount = 10;
         private readonly int MillisecSaveInterval = 500;
+        private readonly string EntityTypeName;
 
-        public EntityContainer(RedisClient redisClient,
+        public EntityContainer(
                             ILoggerFactory logFactory,
-                            TContext context
+                            TContext context,
+                            RedisClient redisClient = null,
+                            int MaxCacheSize = 1000
                             )
         {
-            Type type = typeof(T);
-            m_redisClient = redisClient;
-            m_logger = logFactory.CreateLogger($"EntityContainer.{type.Name}");
-            m_cacheStruct = new ConcurrentDictionary<int, T>();
-            m_updateDb = new ConcurrentDictionary<int, T>();
-            m_waitToDb = new ConcurrentBag<T>();
+            Type type = typeof(TValue);
+            EntityTypeName = type.Name;
+            //m_redisClient = redisClient;
+            m_redisDb = redisClient.GetDatabase("Entity");
+            m_logger = logFactory.CreateLogger($"EntityContainer.{EntityTypeName}");
+            m_cacheStruct = new SizeLimitedCache<TKey, TValue>(MaxCacheSize);
+            m_updateDb = new ConcurrentDictionary<TKey, TValue>();
             m_context = context;
 
             m_lock_data = new object();
             m_lastSaveDbTime = DateTime.MinValue;
 
-            DataModelsAttribute attrib = (DataModelsAttribute)type.GetTypeInfo().GetCustomAttribute(typeof(DataModelsAttribute), false);
-            if (attrib != null)
-            {
-                AllInMem = attrib.AllInMem;
-            }
+            DataAttribs = (DataModelsAttribute)type.GetTypeInfo().GetCustomAttribute(typeof(DataModelsAttribute), false);
 
             Task.Run(TrySaveDb);
 
@@ -73,24 +73,30 @@ namespace CommonServices
         /// </summary>
         protected void Initial()
         {
-            if (AllInMem)
+            if (DataAttribs.LoadInCache)
             {
                 m_sequenceId = 0;
-                m_context.Set<T>()
-                .AsNoTracking()
-                .ForEach((data) =>
+                var datalist = m_context.Set<TValue>().AsNoTracking();
+
+                datalist.ForEach((data) =>
                 {
-                    int id = data.GetId();
-                    m_cacheStruct.AddOrUpdate(id, data, (key, oldValue) => oldValue = data);
-                    if (id > m_sequenceId)
-                        m_sequenceId = id;
+                    m_cacheStruct.AddOrUpdate(data.Key, data, (key, oldValue) => oldValue = data);
+                    //载入redis
+                    if (m_redisDb != null)
+                        m_redisDb.HashSet(EntityTypeName, data.Key.ToRedisValue(), data.ToRedisValue());
+
+                    if (DataAttribs.IncrementKey)
+                        m_sequenceId = data.Key.ToType<int>();
                 });
             }
             else
             {
                 //从数据库获取当前最大的ID
-                m_sequenceId = m_context.Set<T>().CountAsync().GetAwaiter().GetResult() > 0 ?
-                    m_context.Set<T>().MaxAsync(t => t.GetId()).GetAwaiter().GetResult() : 0;
+                if (DataAttribs.IncrementKey)
+                {
+                    m_sequenceId = m_context.Set<TValue>().CountAsync().GetAwaiter().GetResult() > 0 ?
+                    m_context.Set<TValue>().MaxAsync(t => t.Key.ToType<int>()).GetAwaiter().GetResult() : 0;
+                }
             }
             m_state = ContainerStateEnum.Ready;
         }
@@ -110,65 +116,107 @@ namespace CommonServices
         private void CheckReady()
         {
             if (m_state != ContainerStateEnum.Ready)
-                throw new NotSupportedException($"EntityContainer: {typeof(T).FullName} NOT ready.");
+                throw new NotSupportedException($"EntityContainer: {typeof(TValue).FullName} NOT ready.");
         }
         private int GetNextId()
         {
             return System.Threading.Interlocked.Increment(ref m_sequenceId);
         }
 
-        public T this[int id]
+        public TValue this[TKey key]
         {
             get
             {
-                T data = default(T);
-                TryGetValue(id, out data);
-                return data;
+                return Find(key);
             }
             set
             {
                 Add(value);
             }
         }
+        public TValue Find(TKey key)
+        {
+            TValue data = default(TValue);
+            TryGetValue(key, out data);
+            return data;
+        }
 
-        public ICollection<int> Keys
+        public ICollection<TKey> Keys
         {
             get
             {
-                return m_cacheStruct.Keys;
+                if (DataAttribs.LoadInCache)
+                {
+                    if (m_redisDb != null)
+                        return m_redisDb.HashKeys(EntityTypeName).Select(key => key.ToValueOfType<TKey>()).ToArray();
+                    else
+                        return m_cacheStruct.Keys;
+                }
+                else
+                {
+                    return m_context.Set<TValue>().Select(t=>t.Key).ToArray();
+                }
             }
         }
-
-        public ICollection<T> Values
+        public ICollection<TValue> Values
         {
             get
             {
-                return m_cacheStruct.Values;
+                if (DataAttribs.LoadInCache)
+                {
+                    if (m_redisDb != null)
+                        return m_redisDb.HashValues(EntityTypeName).Select(t => t.ToValueOfType<TValue>()).ToArray();
+                    else
+                        return m_cacheStruct.Values;
+                }
+                else
+                {
+                    return m_context.Set<TValue>().AsNoTracking().ToArray();
+                }
             }
         }
 
-        public int Count
+        public long Count
         {
             get
             {
-                return m_cacheStruct.Count;
+                if (DataAttribs.LoadInCache)
+                {
+                    if (m_redisDb != null)
+                        return m_redisDb.HashLength(EntityTypeName);
+                    else
+                        return m_cacheStruct.Count;
+                }
+                else
+                {
+                    return m_context.Set<TValue>().Count();
+                }
             }
         }
 
-        public bool TryGetValue(int id, out T value)
+        public bool TryGetValue(TKey key, out TValue value)
         {
             CheckReady();
-            bool ret = m_cacheStruct.TryGetValue(id, out value);
+            bool ret = m_cacheStruct.TryGetValue(key, out value);
             if (!ret)
             {
+                TValue data = default(TValue);
+                //从redis中获取
+                if (m_redisDb != null)
+                    data = m_redisDb.HashGet(EntityTypeName, key.ToRedisValue()).ToValueOfType<TValue>();
                 //从数据库中获取
-                var data = m_context.Set<T>().Find(id);
+                if (data == null)
+                    data = m_context.Set<TValue>().Find(key);
+                else if (m_redisDb != null)
+                    //载入redis
+                    m_redisDb.HashSet(EntityTypeName, key.ToRedisValue(), data.ToRedisValue());
+
                 if (data != null)
                 {
                     //不追踪修改状态
                     m_context.Entry(data).State = EntityState.Detached;
                     //添加到缓存
-                    m_cacheStruct.AddOrUpdate(id, data, (key, oldValue) => oldValue = data);
+                    m_cacheStruct.AddOrUpdate(key, data, (oldkey, oldValue) => oldValue = data);
                     value = data;
                     ret = true;
                 }
@@ -181,55 +229,61 @@ namespace CommonServices
         /// </summary>
         /// <param name="id"></param>
         /// <param name="value"></param>
-        public void Add(T data)
+        public void Add(TValue data)
         {
             CheckReady();
-            int id = data.GetId();
-            if (id <= 0)
+            if (DataAttribs.IncrementKey)
             {
-                id = GetNextId();
-                data.SetId(id);
+                int id = data.Key.ToType<int>();
+                if (id <= 0)
+                {
+                    id = GetNextId();
+                    data.Key = id.ToType<TKey>();
+                }
             }
             //加入缓存
-            m_cacheStruct.AddOrUpdate(id, data, (key, oldValue) => oldValue = data);
+            m_cacheStruct.AddOrUpdate(data.Key, data, (key, oldValue) => oldValue = data);
+
+            //载入redis
+            if (m_redisDb != null)
+                m_redisDb.HashSet(EntityTypeName, data.Key.ToRedisValue(), data.ToRedisValue());
 
             //存入数据库
             SaveDbAsync(data, EntityActionEnum.Add);
-            //Task.Run(() => AddAsync(data));
         }
 
-        public bool Update(T data)
+        public bool Update(TValue data)
         {
             CheckReady();
-            if (TryGetValue(data.GetId(), out T value))
+            if (TryGetValue(data.Key, out TValue value))
             {
-                data.TryUpdateTime();
+                data.UpdateTime = DateTime.Now;
                 SaveDbAsync(data, EntityActionEnum.Update);
-                //Task.Run(() => UpdateAsync(data));
                 return true;
             }
             return false;
         }
 
-        public bool Remove(int id)
+        public bool Remove(TKey key)
         {
             CheckReady();
-            if (TryGetValue(id, out T data))
+            if (TryGetValue(key, out TValue data))
             {
                 SaveDbAsync(data, EntityActionEnum.Remove);
-                //Task.Run(() => RemoveAsync(data));
 
-                m_cacheStruct.TryRemove(id, out data);
+                m_cacheStruct.TryRemove(key, out data);
+                if (m_redisDb != null)
+                    m_redisDb.HashDelete(EntityTypeName, key.ToRedisValue());
                 return true;
             }
             return false;
         }
 
-        private void SaveDbAsync(T data, EntityActionEnum action)
+        private void SaveDbAsync(TValue data, EntityActionEnum action)
         {
             if (action != EntityActionEnum.Update)
                 data.Action = action;
-            if (m_updateDb.TryAdd(data.GetId(), data))
+            if (m_updateDb.TryAdd(data.Key, data))
             {
                 data.Action = action;
             }
@@ -267,66 +321,69 @@ namespace CommonServices
             }
         }
 
-        public T Refresh(int id)
+        public TValue Refresh(TKey key)
         {
             CheckReady();
-            m_cacheStruct.TryRemove(id, out T data);
-            TryGetValue(id, out data);
+            m_cacheStruct.TryRemove(key, out TValue data);
+            if (m_redisDb != null)
+                m_redisDb.HashDelete(EntityTypeName, key.ToRedisValue());
+            TryGetValue(key, out data);
             return data;
         }
 
         public void Clear()
         {
             m_cacheStruct.Clear();
+            if (m_redisDb != null)
+                Keys.ForEach((key) => { m_redisDb.HashDelete(EntityTypeName, key.ToRedisValue()); });
         }
 
-        public bool ContainsKey(int id)
+        public bool ContainsKey(TKey key)
         {
-            return TryGetValue(id, out T data);
+            return TryGetValue(key, out TValue data);
         }
 
-        public List<T> WhereToList<TKey>(Func<T, bool> predicate)
+        public List<TValue> WhereToList(Func<TValue, bool> predicate)
         {
-            List<T> datalist = null;
-            if (AllInMem)
+            List<TValue> datalist = null;
+            if (DataAttribs.LoadInCache)
             {
                 lock (m_lock_data)
                 {
-                    datalist = new List<T>();
-                    m_cacheStruct.ForEach((data) =>
+                    datalist = new List<TValue>();
+                    Values.ForEach((data) =>
                     {
-                        if (predicate(data.Value))
-                            datalist.Add(data.Value);
+                        if (predicate(data))
+                            datalist.Add(data);
                     });
                 }
             }
             else
             {
-                datalist = m_context.Set<T>().Where(predicate).ToList();
+                datalist = m_context.Set<TValue>().Where(predicate).ToList();
             }
             return datalist;
         }
-        public T FirstOrDefault(Func<T, bool> predicate)
+        public TValue FirstOrDefault(Func<TValue, bool> predicate)
         {
-            if (AllInMem)
+            if (DataAttribs.LoadInCache)
             {
-                var data = m_cacheStruct.FirstOrDefault((item) => predicate(item.Value));
-                return data.Value ?? default(T);
+                return Values.FirstOrDefault((item) => predicate(item));
             }
             else
             {
-                return m_context.Set<T>().FirstOrDefault(predicate);
+                return m_context.Set<TValue>().FirstOrDefault(predicate);
             }
         }
-        public bool Any(Func<T, bool> predicate)
+        public bool Any(Func<TValue, bool> predicate)
         {
-            if (AllInMem)
+            if (DataAttribs.LoadInCache)
             {
-                return m_cacheStruct.Any((item) => predicate(item.Value));
+                return Values.Any((item) => predicate(item));
             }
             else
             {
-                return m_context.Set<T>().Any(predicate);
+                return m_context.Set<TValue>().Any(predicate);
             }
         }
 

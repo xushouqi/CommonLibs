@@ -44,26 +44,33 @@ namespace CodeGenerator
                 if (className.StartsWith(prefix))
                     className = className.Substring(prefix.Length);
 
-                modelStr += "                cfg.CreateMap<" + className + ", " + className + "Data>();\n";
-                repoStr += "            services.AddTransient<IRepository<"+ className + ">, Repository<" + className + ", MainDbContext>>();\n";
-                cacheStr += "            services.AddSingleton<ICacheClient<" + className + ">, HybridCacheClient<" + className + ">>();\n";
-
                 string dataStr = "";
                 int idx = 0;
 
-                var childMembers = ptype.GetProperties(BindingFlags.Instance | BindingFlags.DeclaredOnly | BindingFlags.Public);
-                for (int j = 0; j < childMembers.Length; j++)
+                //主键的类型
+                Type keyType = typeof(int);
+
+                List<PropertyInfo> childMembers = new List<PropertyInfo>(ptype.GetProperties(BindingFlags.Instance | BindingFlags.DeclaredOnly | BindingFlags.Public));
+                if (ptype.BaseType != null)
+                {
+                    var tmp = ptype.BaseType.GetProperties(BindingFlags.Instance | BindingFlags.DeclaredOnly | BindingFlags.Public);
+                    childMembers.InsertRange(0, tmp);
+                }
+                for (int j = 0; j < childMembers.Count; j++)
                 {
                     var pMember = childMembers[j];
                     if (pMember.IsDefined(typeof(DataViewAttribute)))
                     {
-                        var attributes = (DataViewAttribute)pMember.GetCustomAttribute(typeof(DataViewAttribute), false);
+                        var attributes = (DataViewAttribute)pMember.GetCustomAttribute(typeof(DataViewAttribute), true);
 
                         string mName = pMember.Name;
                         //字段类型
                         var mpType = pMember.PropertyType.FullName;
                         mpType = Common.GetReturnTypeName(mpType);
                         mpType = Common.GetSimpleTypeName(mpType);
+
+                        if (attributes.Key)
+                            keyType = pMember.PropertyType;
 
                         string tips = attributes.Tips;
                         if (!string.IsNullOrEmpty(tips))
@@ -89,6 +96,11 @@ namespace CodeGenerator
                         }
                     }
                 }
+
+                modelStr += "                cfg.CreateMap<" + className + ", " + className + "Data>();\n";
+                repoStr += "            services.AddSingleton<EntityContainer<"+ Common.GetSimpleTypeName(keyType.FullName) + ", " + className + ", MainDbContext>>();\n";
+                //repoStr += "            services.AddTransient<IRepository<" + className + ">, Repository<" + className + ", MainDbContext>>();\n";
+                //cacheStr += "            services.AddSingleton<ICacheClient<" + className + ">, HybridCacheClient<" + className + ">>();\n";
 
                 //ViewModels
                 if (!string.IsNullOrEmpty(m_models_path))

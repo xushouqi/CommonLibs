@@ -5,21 +5,8 @@ using CommonLibs;
 
 namespace CommonServices
 {
-    public class JwtBlackRecord : Entity
+    public class JwtBlackRecord : Entity<int>
     {
-        public override int GetId()
-        {
-            return 0;
-        }
-        public override void SetId(int id)
-        {
-            
-        }
-        public override DateTime TryUpdateTime()
-        {
-            return DateTime.Now;
-        }
-
         //[Key]
         public string Jti { get; set; }
 

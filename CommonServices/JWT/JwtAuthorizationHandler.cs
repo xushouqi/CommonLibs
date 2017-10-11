@@ -39,15 +39,11 @@ namespace CommonServices
             else
             {
                 // 检查 jti 是否在数据库里
-                var tokenExists = await _redisClient.GetDatabase("JWT").KeyExistsAsync(jti);
+                var tokenExists = await _redisClient.GetDatabase("JWT", 9).HashExistsAsync("jti", jti);
                 if (tokenExists)
-                {
                     context.Succeed(requirement); // 显式的声明验证成功
-                }
                 else
-                {
                     context.Fail();
-                }
             }
         }
     }

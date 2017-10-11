@@ -94,6 +94,10 @@ namespace CommonLibs
                 SetValueUnlocked(key, value);
             }
         }
+        public virtual void AddOrUpdate(TKey key, TValue value, Func<TKey, TValue, TValue> update)
+        {
+            SetValue(key, value);
+        }
 
         protected virtual CacheValue<TKey, TValue> SetValueUnlocked(TKey key, TValue value)
         {
@@ -134,6 +138,16 @@ namespace CommonLibs
                 _IndexList.Remove(value.IndexRef);
             }
         }
+        public bool TryRemove(TKey key, out TValue value)
+        {
+            bool ret = false;
+            if (TryGetValue(key, out value))
+            {
+                ret = true;
+                Invalidate(key);
+            }
+            return ret;
+        }
 
         public virtual void Expire(TimeSpan maxAge)
         {
@@ -171,15 +185,28 @@ namespace CommonLibs
             }
         }
 
-        public List<TKey> GetKeys()
+        public List<TKey> Keys
         {
-            lock (SyncRoot)
+            get
             {
-                return new List<TKey>(_ValueCache.Keys);
+                lock (SyncRoot)
+                {
+                    return _ValueCache.Keys.ToList();
+                }
+            }
+        }
+        public List<TValue> Values
+        {
+            get
+            {
+                lock (SyncRoot)
+                {
+                    return _ValueCache.Values.Select(t=>t.Value).ToList();
+                }
             }
         }
 
-        public virtual void Flush()
+        public virtual void Clear()
         {
             lock (SyncRoot)
             {

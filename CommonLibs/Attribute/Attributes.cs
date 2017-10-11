@@ -49,7 +49,8 @@ namespace CommonLibs
     [AttributeUsage(AttributeTargets.Class)]
     public class DataModelsAttribute : System.Attribute
     {
-        public bool AllInMem = false;
+        public bool LoadInCache = false;
+        public bool IncrementKey = true;
     }
 
     //[AttributeUsage(AttributeTargets.Class)]
@@ -66,6 +67,7 @@ namespace CommonLibs
     [AttributeUsage(AttributeTargets.Property)]
     public class DataViewAttribute : System.Attribute
     {
+        public bool Key = false;
         public string Tips = string.Empty;
     }
 

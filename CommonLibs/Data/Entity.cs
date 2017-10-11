@@ -10,12 +10,12 @@ namespace CommonLibs
         Remove,
     }
 
-    public abstract class Entity
+    public abstract class Entity<TKey>
     {
-        public abstract int GetId();
-        public abstract void SetId(int id);
-        //public abstract string GetKey();
-        public abstract System.DateTime TryUpdateTime();
+        [DataView(Key = true)]
+        public TKey Key { get; set; }
+
+        public System.DateTime UpdateTime { get; set; }
 
         public EntityActionEnum Action = EntityActionEnum.None;
     }
