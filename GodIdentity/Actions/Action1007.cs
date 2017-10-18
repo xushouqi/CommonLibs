@@ -28,7 +28,7 @@ namespace GodIdentity.Actions
             if (m_params != null)
             {
 
-                var retData = await m_service.UpdateMyToken(m_accountId, m_socket);
+                var retData = await m_service.UpdateMyToken(m_accountId, ConnType, m_channel);
 				var data = new ReturnData<AccountData>{
                     ErrorCode = retData.ErrorCode,
                     Data = Mapper.Map<AccountData>(retData.Data),

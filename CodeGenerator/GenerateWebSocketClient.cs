@@ -65,7 +65,7 @@ namespace CodeGenerator
                     var attributes = (ApiAttribute)vMethodInfo.GetCustomAttribute(typeof(ApiAttribute), false);
 
                     //客户端注册回调函数
-                    client_regcallbacks += "            client.RegActions[" + attributes.ActionId + "] = On" + vMethodInfo.Name + "CallBack;\n";
+                    client_regcallbacks += "            client.RegActionCallbak(" + attributes.ActionId + ", On" + vMethodInfo.Name + "CallBack);\n";
               
                     //返回值
                     Type methodReturnType = vMethodInfo.ReturnType;
@@ -95,6 +95,7 @@ namespace CodeGenerator
                         System.Type stype = paramInfo.ParameterType;
                         string typestr = Common.GetSimpleTypeName(stype.ToString());
 
+                        //需要验证身份
                         bool skipMethd = attributes.AuthPolicy != UserTypeEnum.None && paramInfo.Name.Equals("accountId");
                         if (skipMethd)
                             serverUseParams = "m_accountId";
@@ -118,9 +119,8 @@ namespace CodeGenerator
                         //}
                         if (!skipMethd)
                         { 
-                            if (CodeCommon.CheckParamSocket(paramInfo))
+                            if (CodeCommon.CheckParamSocket(paramInfo, ref serverUseParams))
                             {
-                                serverUseParams += "m_socket";
                                 skipMethd = true;
                             }
                             else
@@ -144,7 +144,8 @@ namespace CodeGenerator
 
                         if (j < paramInfos.Length - 1)
                         {
-                            if (paramInfos.Length > j + 1 && CodeCommon.CheckParamSocket(paramInfos[j + 1]))
+                            string tmp = "";
+                            if (paramInfos.Length > j + 1 && CodeCommon.CheckParamSocket(paramInfos[j + 1], ref tmp))
                             {
 
                             }

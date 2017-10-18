@@ -132,9 +132,8 @@ namespace CodeGenerator
 
                                 if (!skipMethd)
                                 {
-                                    if (CodeCommon.CheckParamSocket(paramInfo))
+                                    if (CodeCommon.CheckParamSocket(paramInfo, ref serverUseParams))
                                     {
-                                        serverUseParams += "m_socket";
                                         skipMethd = true;
                                     }
                                     else
@@ -166,12 +165,14 @@ namespace CodeGenerator
                                 }
                                 else
                                     paramsFromDic += paramInfo.Name;
-                                if (!CodeCommon.CheckParamSocket(paramInfo))
+
+                                string tmp = "";
+                                if (!CodeCommon.CheckParamSocket(paramInfo, ref tmp))
                                     inputParams += paramInfo.Name;
 
                                 if (j < paramInfos.Length - 1)
                                 {
-                                    if (paramInfos.Length > j + 1 && CodeCommon.CheckParamSocket(paramInfos[j + 1]))
+                                    if (paramInfos.Length > j + 1 && CodeCommon.CheckParamSocket(paramInfos[j + 1], ref tmp))
                                     {
 
                                     }

@@ -15,6 +15,8 @@ namespace CommonLibs
         UnAuthorized,
         Expired,
         NotValid,
+        TimeOut,
+        Disconnected,
 
         WrongPassword,
         InvalidDataformat,

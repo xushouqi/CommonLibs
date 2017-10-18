@@ -149,9 +149,20 @@ namespace CodeGenerator
             Console.WriteLine("Write ClientFile: " + filename);
         }
 
-        public static bool CheckParamSocket(ParameterInfo paramInfo)
+        public static bool CheckParamSocket(ParameterInfo paramInfo, ref string useParams)
         {
-            return paramInfo.Name.Equals("socket");
+            bool ret = paramInfo.Name.Equals("socket");
+            if (paramInfo.ParameterType == typeof(UserConnTypeEnum) && paramInfo.Name.Equals("connType"))
+            {
+                ret = true;
+                useParams += "ConnType";
+            }
+            else if (paramInfo.ParameterType == typeof(string) && paramInfo.Name.Equals("channel"))
+            {
+                ret = true;
+                useParams += "m_channel";
+            }
+            return ret;
         }
 
         public static string GetReadString(string stype)

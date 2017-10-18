@@ -10,11 +10,11 @@
 
 				if (m_#MethodName#Callback != null)
 				{
-					m_#MethodName#Callback(package.MyError, retData);
+					m_#MethodName#Callback(package.ErrorCode, retData);
 					m_#MethodName#Callback = null;
 				}
 			
 				if (m_#MethodName#CallbackAdd != null)
-					m_#MethodName#CallbackAdd(package.MyError, retData);
+					m_#MethodName#CallbackAdd(package.ErrorCode, retData);
 			}
 		}

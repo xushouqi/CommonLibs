@@ -7,42 +7,28 @@ using System.Net.WebSockets;
 
 namespace CommonNetwork
 {
-    public class ClientSocket
+    public class WebSocketClient : SocketClientBase, ISocketClient
     {
-        private static ClientSocket m_instance = null;
-        public static ClientSocket Instance
+        private static WebSocketClient m_instance = null;
+        public static WebSocketClient Instance
         {
             get
             {
                 if (m_instance == null)
                 {
-                    m_instance = new ClientSocket();
+                    m_instance = new WebSocketClient();
                 }
                 return m_instance;
             }
         }
 
         private ClientWebSocket m_socket;
-        private const int BufferSize = 8192;
         private string m_url = "ws://127.0.0.1:22337/ws";
-        private Dictionary<int, Action<WebPackage>> m_callbacks = null;
-        private Dictionary<int, WebPackage> m_packages = null;
-        private Dictionary<int, Semaphore> m_semaphores = null;
+
         private Task m_waitReceiver;
 
-        public Action<bool, string> OnConnect = null;
-        public Action<string> OnDisconnect = null;
-        public Action<string> OnError = null;
-
-        public Dictionary<int, Action<WebPackage>> RegActions = null;
-
-        public ClientSocket()
+        public WebSocketClient()
         {
-            RegActions = new Dictionary<int, Action<WebPackage>>();
-            m_callbacks = new Dictionary<int, Action<WebPackage>>();
-            m_semaphores = new Dictionary<int, Semaphore>();
-            m_packages = new Dictionary<int, WebPackage>();
-
             try
             {
                 m_socket = new ClientWebSocket();
@@ -58,56 +44,22 @@ namespace CommonNetwork
             bool ret = m_socket != null && m_socket.State == WebSocketState.Open;
             return ret;
         }
-
-        public async Task<bool> ConnectServerAsync(string address)
+        
+        public async Task<bool> ConnectServerAsync(string address, int port, Action<bool, string> onConnect = null)
         {
             if (m_socket != null
                  && (m_socket.State == WebSocketState.Connecting || m_socket.State == WebSocketState.Open)
                  )
                 return false;
 
-            m_url = "ws://" + address + "/ws";
+            m_url = string.Concat("ws://", address, ":", port, "/ws");
             string message = "OK";
             bool success = false;
             try
             {
                 if (m_waitReceiver == null || m_waitReceiver.Status != TaskStatus.Running)
                 {
-                    await m_socket.ConnectAsync(new Uri(m_url), new CancellationTokenSource(6000).Token);
-
-                    m_waitReceiver = new Task(() => { WaitReceive().Wait(); });
-                    m_waitReceiver.Start();
-                    success = true;
-                }
-                else
-                    message = "GodIdentity m_waitReceiver is Still Running!!! Can't Connect!!!";
-            }
-            catch (Exception ex)
-            {
-                message = ex.Message;
-                success = false;
-                ClientCommon.DebugLog(message);
-            }
-            if (OnConnect != null)
-                OnConnect(success, message);
-            return success;
-        }
-
-        public void ConnectServer(string address, Action<bool, string> onConnect = null)
-        {
-            if (m_socket != null
-                && (m_socket.State == WebSocketState.Connecting || m_socket.State == WebSocketState.Open)
-                )
-                return;
-
-            m_url = "ws://" + address + "/ws";
-            string message = "OK";
-            bool success = false;
-            try
-            {
-                if (m_waitReceiver == null || m_waitReceiver.Status != TaskStatus.Running)
-                {
-                    m_socket.ConnectAsync(new Uri(m_url), new CancellationTokenSource(6000).Token).Wait();
+                    await m_socket.ConnectAsync(new Uri(m_url), new CancellationTokenSource(TimeOutMilliseconds).Token);
 
                     m_waitReceiver = new Task(() => { WaitReceive().Wait(); });
                     m_waitReceiver.Start();
@@ -125,7 +77,8 @@ namespace CommonNetwork
             if (OnConnect != null)
                 OnConnect(success, message);
             if (onConnect != null)
-                onConnect(success, message);    
+                onConnect(success, message);
+            return success;
         }
 
         async Task WaitReceive()
@@ -148,24 +101,7 @@ namespace CommonNetwork
                             //是合法的数据包
                             if (package != null)
                             {
-                                m_packages[package.ID] = package;
-                                //根据ActionId注册
-                                if (package.MyError == ErrorCodeEnum.Success)
-                                {
-                                    if (RegActions.ContainsKey(package.ActionId))
-                                        RegActions[package.ActionId](package);
-                                }
-                                //根据PacageId注册，每个Package不一样
-                                if (m_callbacks.ContainsKey(package.ID))
-                                {
-                                    m_callbacks[package.ID](package);
-                                    m_callbacks.Remove(package.ID);
-                                }
-                                if (m_semaphores.ContainsKey(package.ID))
-                                {
-                                    m_semaphores[package.ID].Release();
-                                    m_semaphores.Remove(package.ID);
-                                }
+                                DoReceivePackage(package);
                             }
                         }
                         else if (incoming.MessageType == WebSocketMessageType.Text)
@@ -224,7 +160,7 @@ namespace CommonNetwork
                 try
                 {
                     //m_socket.CloseAsync(WebSocketCloseStatus.Empty, "", new CancellationToken()).Wait();
-                    m_socket.CloseOutputAsync(WebSocketCloseStatus.Empty, "", new CancellationTokenSource(3000).Token).Wait();
+                    m_socket.CloseOutputAsync(WebSocketCloseStatus.Empty, "", new CancellationTokenSource(TimeOutMilliseconds).Token).Wait();
                 }
                 catch (Exception e)
                 {
@@ -233,25 +169,12 @@ namespace CommonNetwork
             }
         }
 
-        private int m_id = 0;
-        private WebPackage CreatePackage(int actionId, byte[] param, int accountId = 0)
-        {
-            var package = new WebPackage
-            {
-                ActionId = actionId,
-                Uid = accountId,
-                ID = System.Threading.Interlocked.Increment(ref m_id),
-                Params = param,
-            };
-            return package;
-        }
-
         public WebPackage Send(int actionId, byte[] param, Action<WebPackage> callback)
         {
             var package = CreatePackage(actionId, param);
 
             var result = ProtoBufUtils.Serialize(package);
-            m_socket.SendAsync(new ArraySegment<byte>(result), WebSocketMessageType.Binary, true, new CancellationTokenSource(9000).Token).Wait();
+            m_socket.SendAsync(new ArraySegment<byte>(result), WebSocketMessageType.Binary, true, new CancellationTokenSource(TimeOutMilliseconds).Token).Wait();
 
             m_callbacks[package.ID] = callback;
             return package;
@@ -259,20 +182,26 @@ namespace CommonNetwork
 
         public async Task<WebPackage> SendAsync(int actionId, byte[] param)
         {
-            var package = CreatePackage(actionId, param);
-
-            var result = ProtoBufUtils.Serialize(package);
-            await m_socket.SendAsync(new ArraySegment<byte>(result), WebSocketMessageType.Binary, true, new CancellationTokenSource(9000).Token);
-
-            Task task = new Task(() =>
+            WebPackage package = null;
+            if (CheckConnection())
             {
-                Semaphore mux = new Semaphore(0, int.MaxValue);
-                m_semaphores[package.ID] = mux;
-                mux.WaitOne();
-            });
-            task.Start();
-            Task.WaitAll(task);
-            m_packages.TryGetValue(package.ID, out package);
+                package = CreatePackage(actionId, param);
+
+                var result = ProtoBufUtils.Serialize(package);
+                await m_socket.SendAsync(new ArraySegment<byte>(result), WebSocketMessageType.Binary, true, new CancellationTokenSource(TimeOutMilliseconds).Token);
+
+                Task task = new Task(() =>
+                {
+                    Semaphore mux = new Semaphore(0, int.MaxValue);
+                    m_semaphores[package.ID] = mux;
+                    mux.WaitOne();
+                });
+                task.Start();
+                if (Task.WaitAll(new Task[] { task }, TimeOutMilliseconds))
+                    m_packages.TryGetValue(package.ID, out package);
+                else
+                    package.ErrorCode = ErrorCodeEnum.TimeOut;
+            }
             return package;
         }
 

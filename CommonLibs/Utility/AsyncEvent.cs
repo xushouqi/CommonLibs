@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace CommonServices.Utility
+namespace CommonLibs
 {
     public class AsyncEvent<TEventArgs> : IObservable<TEventArgs>, IDisposable where TEventArgs : EventArgs
     {

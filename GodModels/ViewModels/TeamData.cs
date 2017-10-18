@@ -6,45 +6,45 @@ namespace GodModels.ViewModels
     public class TeamData
     {
         [ProtoMember(1)]
-        public int ID { get; set; }
+        public int Key { get; set; }
         [ProtoMember(2)]
-        public int RoleId { get; set; }
+        public int ID { get; set; }
         [ProtoMember(3)]
-        public string Name { get; set; }
+        public int RoleId { get; set; }
         [ProtoMember(4)]
+        public string Name { get; set; }
+        [ProtoMember(5)]
         public TeamTypeEnum Type { get; set; }
         /// <summary>
         /// 赛区
         /// </summary>
-        [ProtoMember(5)]
+        [ProtoMember(6)]
         public int Region { get; set; }
         /// <summary>
         /// 等级
         /// </summary>
-        [ProtoMember(6)]
+        [ProtoMember(7)]
         public int Grade { get; set; }
         /// <summary>
         /// 粉丝数（用于升级）
         /// </summary>
-        [ProtoMember(7)]
+        [ProtoMember(8)]
         public int Fans { get; set; }
         /// <summary>
         /// 总生涯天数(从周一开始)
         /// </summary>
-        [ProtoMember(8)]
+        [ProtoMember(9)]
         public int CareerDays { get; set; }
         /// <summary>
         /// 金钱
         /// </summary>
-        [ProtoMember(9)]
+        [ProtoMember(10)]
         public int Money { get; set; }
         /// <summary>
         /// 积分（来自于PVP）
         /// </summary>
-        [ProtoMember(10)]
-        public int Point { get; set; }
         [ProtoMember(11)]
-        public int Key { get; set; }
+        public int Point { get; set; }
 
     }
 }

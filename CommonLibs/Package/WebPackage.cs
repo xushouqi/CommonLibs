@@ -23,7 +23,7 @@ namespace CommonLibs
         public byte[] Return;
 
         [ProtoMember(6)]
-        public int ErrorCode;
+        public ErrorCodeEnum ErrorCode;
 
         [ProtoMember(7)]
         public int Uid;
@@ -31,6 +31,15 @@ namespace CommonLibs
         [ProtoMember(8)]
         public string Token;
 
-        public ErrorCodeEnum MyError { get { return (ErrorCodeEnum)ErrorCode; } }
+        [ProtoMember(9)]
+        public int Room = 0;
+
+        [ProtoMember(10)]
+        public int Turn = 0;
+
+        public WebPackage ShallowCopy()
+        {
+            return (WebPackage)this.MemberwiseClone();
+        }
     }
 }

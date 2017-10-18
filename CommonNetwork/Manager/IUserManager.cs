@@ -8,11 +8,11 @@ namespace CommonNetwork
     {
         int GetSocketUserCount();
         int GetTotalUserCount();
-        T UpdateUser(WebSocket socket, int userId, UserTypeEnum userType, int roleId, string token, double expiresIn);
-        int RemoveUser(WebSocket socket);
-        bool RemoveUser(int id);
-        bool ValidSocket(WebSocket socket);
-        T GetUserData(WebSocket socket);
-        T GetUserData(int id);
+        T UpdateUser(UserConnTypeEnum connType, string channel, int userId, UserTypeEnum userType, int roleId, string token, double expiresIn);
+        int RemoveUser(string channel);
+        bool RemoveUserById(int id);
+        bool ValidChannel(string channel);
+        T GetUserData(string channel);
+        T GetUserDataById(int id);
     }
 }

@@ -2,47 +2,44 @@
 using System.Collections.Generic;
 using System.Collections.Concurrent;
 using System.Linq;
-using System.Threading.Tasks;
-using System.Net.WebSockets;
 using CommonLibs;
 
 namespace CommonNetwork
 {
     public class UserManager<T> : IUserManager<T> where T:UserData
     {
-        ConcurrentDictionary<int, int> m_useridBySocket = new ConcurrentDictionary<int, int>();
+        ConcurrentDictionary<string, int> m_useridByChannel = new ConcurrentDictionary<string, int>();
         ConcurrentDictionary<int, T> m_usersById = new ConcurrentDictionary<int, T>();
 
         object m_lock = new object();
 
         public int GetSocketUserCount()
         {
-            return m_useridBySocket.Count;
+            return m_useridByChannel.Count;
         }
         public int GetTotalUserCount()
         {
             return m_usersById.Count;
         }
 
-        public virtual T UpdateUser(WebSocket socket, int userId, UserTypeEnum userType, int roleId, string jti, double expiresIn)
+        public virtual T UpdateUser(UserConnTypeEnum connType, string channel, int userId, UserTypeEnum userType, int roleId, string jti, double expiresIn)
         {
             T data = default(T);
             if (userId > 0)
             {
                 lock (m_lock)
                 {
-                    int handle = -1;
-                    if (socket != null)
+                    if (!string.IsNullOrEmpty(channel))
                     {
-                        handle = socket.GetHashCode();
-                        m_useridBySocket.AddOrUpdate(handle, userId, (key, oldValue) => userId);
+                        m_useridByChannel.AddOrUpdate(channel, userId, (key, oldValue) => userId);
                     }
 
                     if (m_usersById.TryGetValue(userId, out data))
                     {
                         data.Type = userType;
                         data.RoleId = roleId;
-                        data.SocketHandle = handle;
+                        data.Channel = channel;
+                        data.ConnType = connType;
                         data.Jti = jti;
                         data.ExpireTime = DateTime.Now.AddSeconds(expiresIn);
                     }
@@ -52,12 +49,13 @@ namespace CommonNetwork
                         data.ID = userId;
                         data.Type = userType;
                         data.RoleId = roleId;
-                        data.SocketHandle = handle;
+                        data.Channel = channel;
+                        data.ConnType = connType;
                         data.Jti = jti;
                         data.ExpireTime = DateTime.Now.AddSeconds(expiresIn);
                         m_usersById.TryAdd(userId, data);
 
-                        var explist = m_usersById.Where(t => t.Value.ExpireTime > DateTime.Now).ToArray();
+                        var explist = m_usersById.Where(t => t.Value.ExpireTime < DateTime.Now).ToArray();
                         for (int i = 0; i < explist.Length; i++)
                         {
                             m_usersById.TryRemove(explist[i].Key, out T value);
@@ -67,25 +65,21 @@ namespace CommonNetwork
             }
             return data;
         }
-
-        public virtual int RemoveUser(WebSocket socket)
+        
+        public int RemoveUser(string channel)
         {
             int id = 0;
             lock (m_lock)
             {
-                int handle = socket.GetHashCode();
-                if (m_useridBySocket.TryGetValue(handle, out id))
+                if (m_useridByChannel.TryGetValue(channel, out id))
                 {
-                    T data = null;
-                    m_usersById.TryRemove(id, out data);
-
-                    int tid = 0;
-                    m_useridBySocket.TryRemove(handle, out tid);
+                    m_usersById.TryRemove(id, out T data);
+                    m_useridByChannel.TryRemove(channel, out int tid);
                 }
             }
             return id;
         }
-        public virtual bool RemoveUser(int id)
+        public virtual bool RemoveUserById(int id)
         {
             bool ret = false;
             lock (m_lock)
@@ -94,37 +88,31 @@ namespace CommonNetwork
                 if (m_usersById.TryGetValue(id, out data))
                 {
                     ret = true;
-
-                    int tid = 0;
-                    m_useridBySocket.TryRemove(data.SocketHandle, out tid);
-
-                    T tdata = null;
-                    m_usersById.TryRemove(id, out tdata);
+                    if (!string.IsNullOrEmpty(data.Channel))
+                        m_useridByChannel.TryRemove(data.Channel, out int tid);
+                    m_usersById.TryRemove(id, out T tdata);
                 }
             }
             return ret;
         }
 
-        public bool ValidSocket(WebSocket socket)
+        public bool ValidChannel(string channel)
         {
-            int handle = socket.GetHashCode();
-            return handle >=0 && m_useridBySocket.ContainsKey(handle);
+            return m_useridByChannel.ContainsKey(channel);
         }
-
-        public virtual T GetUserData(WebSocket socket)
-        {
-            T user = null;
-            int id = 0;
-            int handle = socket.GetHashCode();
-            m_useridBySocket.TryGetValue(handle, out id);
-            if (id > 0)
-                m_usersById.TryGetValue(id, out user);
-            return user;
-        }
-        public virtual T GetUserData(int id)
+        public virtual T GetUserDataById(int id)
         {
             T user = null;
             m_usersById.TryGetValue(id, out user);
+            return user;
+        }
+
+        public T GetUserData(string channel)
+        {
+            T user = null;
+            m_useridByChannel.TryGetValue(channel, out int id);
+            if (id > 0)
+                m_usersById.TryGetValue(id, out user);
             return user;
         }
     }

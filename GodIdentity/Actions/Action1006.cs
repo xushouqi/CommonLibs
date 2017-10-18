@@ -30,7 +30,7 @@ namespace GodIdentity.Actions
                 var username = m_params.ReadString();
                 var password = m_params.ReadString();
 
-                var retData = await m_service.Login(username, password, m_socket);
+                var retData = await m_service.Login(username, password, ConnType, m_channel);
 				var data = new ReturnData<AccountData>{
                     ErrorCode = retData.ErrorCode,
                     Data = Mapper.Map<AccountData>(retData.Data),

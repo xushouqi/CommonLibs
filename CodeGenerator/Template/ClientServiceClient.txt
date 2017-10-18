@@ -8,8 +8,8 @@ namespace CommonNetwork.#ProjectName#
 {
 	public class #ClassName#Client
 	{
-		private ClientSocket m_client;
-		public #ClassName#Client(ClientSocket client)
+		private ISocketClient m_client;
+		public #ClassName#Client(ISocketClient client)
 		{
 			m_client = client;
 			

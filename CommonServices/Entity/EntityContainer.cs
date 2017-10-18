@@ -52,7 +52,7 @@ namespace CommonServices
             Type type = typeof(TValue);
             EntityTypeName = type.Name;
             //m_redisClient = redisClient;
-            m_redisDb = redisClient.GetDatabase("Entity");
+            //m_redisDb = redisClient.GetDatabase("Entity");
             m_logger = logFactory.CreateLogger($"EntityContainer.{EntityTypeName}");
             m_cacheStruct = new SizeLimitedCache<TKey, TValue>(MaxCacheSize);
             m_updateDb = new ConcurrentDictionary<TKey, TValue>();
@@ -94,8 +94,8 @@ namespace CommonServices
                 //从数据库获取当前最大的ID
                 if (DataAttribs.IncrementKey)
                 {
-                    m_sequenceId = m_context.Set<TValue>().CountAsync().GetAwaiter().GetResult() > 0 ?
-                    m_context.Set<TValue>().MaxAsync(t => t.Key.ToType<int>()).GetAwaiter().GetResult() : 0;
+                    int count = m_context.Set<TValue>().CountAsync().GetAwaiter().GetResult();
+                    m_sequenceId = count > 0 ? m_context.Set<TValue>().MaxAsync(t => t.Key.ToType<int>()).GetAwaiter().GetResult() : 0;
                 }
             }
             m_state = ContainerStateEnum.Ready;
@@ -294,7 +294,7 @@ namespace CommonServices
             while (true)
             {
                 if (m_updateDb.Count >= MinToDbCount
-                    || MathUtils.DiffDate(m_lastSaveDbTime).TotalMilliseconds >= MillisecSaveInterval
+                    || (m_updateDb.Count > 0 && MathUtils.DiffDate(m_lastSaveDbTime).TotalMilliseconds >= MillisecSaveInterval)
                     )
                 {
                     await DoSaveDb();
