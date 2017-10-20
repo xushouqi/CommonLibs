@@ -2,7 +2,7 @@
   "profiles": {
     "CodeGenerator": {
       "commandName": "Project",
-      "commandLineArgs": " -c false -t Template -d C:\\SVN\\EClub\\Servers\\GodIdentity\\bin\\Debug\\netcoreapp2.0\\GodIdentity.dll"
+      "commandLineArgs": " -c false -t Template -d C:\\SVN\\EClub\\Servers\\Dungeon\\bin\\Debug\\netcoreapp2.0\\Dungeon.dll"
     }
   }
 }

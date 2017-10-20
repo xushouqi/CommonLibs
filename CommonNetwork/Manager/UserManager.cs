@@ -8,10 +8,31 @@ namespace CommonNetwork
 {
     public class UserManager<T> : IUserManager<T> where T:UserData
     {
-        ConcurrentDictionary<string, int> m_useridByChannel = new ConcurrentDictionary<string, int>();
-        ConcurrentDictionary<int, T> m_usersById = new ConcurrentDictionary<int, T>();
+        private ConcurrentDictionary<string, int> m_useridByChannel = new ConcurrentDictionary<string, int>();
+        private ConcurrentDictionary<int, T> m_usersById = new ConcurrentDictionary<int, T>();
 
-        object m_lock = new object();
+        private object m_lock = new object();
+
+        public Action<UserData> OnUpdateUser;
+        public Action<int> OnRemoveUser;
+
+
+        public void AddOnUpdateUser(Action<UserData> callback)
+        {
+            OnUpdateUser += callback;
+        }
+        public void AddOnRemoveUser(Action<int> callback)
+        {
+            OnRemoveUser += callback;
+        }
+        public void RemoveOnUpdateUser(Action<UserData> callback)
+        {
+            OnUpdateUser -= callback;
+        }
+        public void RemoveOnRemoveUser(Action<int> callback)
+        {
+            OnRemoveUser -= callback;
+        }
 
         public int GetSocketUserCount()
         {
@@ -45,6 +66,12 @@ namespace CommonNetwork
                     }
                     else
                     {
+                        var explist = m_usersById.Where(t => t.Value.ExpireTime < DateTime.Now).ToArray();
+                        for (int i = 0; i < explist.Length; i++)
+                        {
+                            m_usersById.TryRemove(explist[i].Key, out T value);
+                        }
+
                         data = (T)Activator.CreateInstance(typeof(T));
                         data.ID = userId;
                         data.Type = userType;
@@ -54,19 +81,15 @@ namespace CommonNetwork
                         data.Jti = jti;
                         data.ExpireTime = DateTime.Now.AddSeconds(expiresIn);
                         m_usersById.TryAdd(userId, data);
-
-                        var explist = m_usersById.Where(t => t.Value.ExpireTime < DateTime.Now).ToArray();
-                        for (int i = 0; i < explist.Length; i++)
-                        {
-                            m_usersById.TryRemove(explist[i].Key, out T value);
-                        }
                     }
                 }
+                if (OnUpdateUser != null && data != null)
+                    OnUpdateUser(data);
             }
             return data;
         }
         
-        public int RemoveUser(string channel)
+        public virtual int RemoveUser(string channel)
         {
             int id = 0;
             lock (m_lock)
@@ -77,6 +100,8 @@ namespace CommonNetwork
                     m_useridByChannel.TryRemove(channel, out int tid);
                 }
             }
+            if (OnRemoveUser != null && id > 0)
+                OnRemoveUser(id);
             return id;
         }
         public virtual bool RemoveUserById(int id)
@@ -93,6 +118,8 @@ namespace CommonNetwork
                     m_usersById.TryRemove(id, out T tdata);
                 }
             }
+            if (OnRemoveUser != null && id > 0)
+                OnRemoveUser(id);
             return ret;
         }
 
@@ -107,7 +134,7 @@ namespace CommonNetwork
             return user;
         }
 
-        public T GetUserData(string channel)
+        public virtual T GetUserData(string channel)
         {
             T user = null;
             m_useridByChannel.TryGetValue(channel, out int id);

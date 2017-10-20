@@ -11,6 +11,14 @@ namespace CommonNetwork
     public class TcpSocketClient : SocketClientBase, ISocketClient
     {
         private TcpClient m_tcpClient;
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="autoDispatch">是否自动分发，Unity中选择False</param>
+        public TcpSocketClient(bool autoDispatch) : base(autoDispatch)
+        {
+
+        }
 
         public bool CheckConnection()
         {
@@ -19,13 +27,60 @@ namespace CommonNetwork
 
         public void CloseConnection()
         {
-            if (m_tcpClient != null && m_tcpClient.Connected)
-                m_tcpClient.Close();
-
+            try
+            {
+                if (m_tcpClient != null && m_tcpClient.Connected)
+                    m_tcpClient.Close();
+                if (m_receiveCancelSource != null && !m_receiveCancelSource.IsCancellationRequested)
+                {
+                    m_receiveCancelSource.Cancel();
+                    m_receiveCancelSource = null;
+                }
+            }
+            catch (Exception e)
+            {
+                OnError(e.Message);
+            }
             if (OnDisconnect != null)
                 OnDisconnect("");
         }
-        
+
+        CancellationTokenSource m_receiveCancelSource;
+
+        public bool ConnectServer(string address, int port, Action<bool, string> onConnect = null)
+        {
+            bool ret = false;
+            string message = "OK";
+            m_tcpClient = new TcpClient();
+            try
+            {
+                if (m_receiveCancelSource == null)
+                {
+                    m_tcpClient.Connect(address, port);
+                    m_tcpClient.NoDelay = true;
+                    m_tcpClient.ReceiveBufferSize = BufferSize;
+                    m_tcpClient.SendBufferSize = BufferSize;
+                    ret = true;
+
+                    m_receiveCancelSource = new CancellationTokenSource();
+                    //等待接收数据
+                    Task task = new Task(() => WaitToReceive().Wait(m_receiveCancelSource.Token));
+                    task.Start();
+                }
+                else
+                    message = "WaitReceive is Still Running!!! Can't Connect!!!";
+            }
+            catch (Exception e)
+            {
+                message = e.Message;
+            }
+            if (OnConnect != null)
+                OnConnect(ret, message);
+            if (onConnect != null)
+                onConnect(ret, message);
+            return ret;
+        }
+
         public async Task<bool> ConnectServerAsync(string address, int port, Action<bool, string> onConnect = null)
         {
             bool ret = false;
@@ -33,15 +88,21 @@ namespace CommonNetwork
             m_tcpClient = new TcpClient();
             try
             {
-                await m_tcpClient.ConnectAsync(address, port);
-                m_tcpClient.NoDelay = true;
-                m_tcpClient.ReceiveBufferSize = BufferSize;
-                m_tcpClient.SendBufferSize = BufferSize;
-                ret = true;
+                if (m_receiveCancelSource == null)
+                {
+                    await m_tcpClient.ConnectAsync(address, port);
+                    m_tcpClient.NoDelay = true;
+                    m_tcpClient.ReceiveBufferSize = BufferSize;
+                    m_tcpClient.SendBufferSize = BufferSize;
+                    ret = true;
 
-                //等待接收数据
-                Task task = new Task(() => WaitToReceive().Wait());
-                task.Start();
+                    m_receiveCancelSource = new CancellationTokenSource();
+                    //等待接收数据
+                    Task task = new Task(() => WaitToReceive().Wait(m_receiveCancelSource.Token));
+                    task.Start();
+                }
+                else
+                    message = "WaitReceive is Still Running!!! Can't Connect!!!";
             }
             catch(Exception e)
             {
@@ -97,7 +158,7 @@ namespace CommonNetwork
             WebPackage package = null;
             if (CheckConnection())
             {
-                package = CreatePackage(actionId, param);
+                package = m_packageManager.CreateRequestPackage(actionId, 0, 0, param);
                 var result = ProtoBufUtils.Serialize(package);
 
                 NetworkStream ns = m_tcpClient.GetStream();
@@ -116,28 +177,36 @@ namespace CommonNetwork
             WebPackage package = null;
             if (CheckConnection())
             {
-                package = CreatePackage(actionId, param);
-                var result = ProtoBufUtils.Serialize(package);
-
                 NetworkStream ns = m_tcpClient.GetStream();
                 if (ns.CanWrite)
                 {
-                    await ns.WriteAsync(result, 0, result.Length);
-                }
+                    package = m_packageManager.CreateRequestPackage(actionId, 0, 0, param);
+                    var result = ProtoBufUtils.Serialize(package);
 
-                Task task = new Task(() =>
-                {
-                    Semaphore mux = new Semaphore(0, int.MaxValue);
-                    m_semaphores[package.ID] = mux;
-                    mux.WaitOne();
-                });
-                task.Start();
-                if (Task.WaitAll(new Task[] { task }, TimeOutMilliseconds))
-                    m_packages.TryGetValue(package.ID, out package);
+                    ns.Write(result, 0, result.Length);
+                    //todo: QUESTION!!! Why sometimes not send????
+                    //await ns.WriteAsync(result, 0, result.Length);
+
+                    Task<bool> task = new Task<bool>(() =>
+                    {
+                        Semaphore mux = new Semaphore(0, int.MaxValue);
+                        m_semaphores[package.ID] = mux;
+                        bool ret = mux.WaitOne(TimeOutMilliseconds);
+                        return ret;
+                    });
+                    task.Start();
+                    Task.WaitAll(task);
+                    if (task.Result)
+                        m_packages.TryGetValue(package.ID, out package);
+                    else
+                        package.ErrorCode = ErrorCodeEnum.TimeOut;
+                }
                 else
-                    package.ErrorCode = ErrorCodeEnum.TimeOut;
+                    package = m_packageManager.CreatePackage(PackageTypeEnum.Act, actionId, 0, 0, ErrorCodeEnum.Disconnected);
             }
-            return package;
+            else
+                package = m_packageManager.CreatePackage(PackageTypeEnum.Act, actionId, 0, 0, ErrorCodeEnum.Disconnected);
+            return await Task.FromResult(package);
         }
     }
 }

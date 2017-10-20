@@ -2,9 +2,12 @@
 
 namespace CommonLibs
 {
-    public enum PackageCodeEnum
+    public enum PackageTypeEnum
     {
-        Register = 1001,
+        Request = 0,
+        Act,
+        Push,
+        Room,
     }
 
     [ProtoContract]
@@ -36,6 +39,9 @@ namespace CommonLibs
 
         [ProtoMember(10)]
         public int Turn = 0;
+
+        [ProtoMember(11)]
+        public PackageTypeEnum Type = PackageTypeEnum.Request;
 
         public WebPackage ShallowCopy()
         {

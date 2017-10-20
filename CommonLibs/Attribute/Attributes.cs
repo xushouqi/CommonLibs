@@ -69,6 +69,7 @@ namespace CommonLibs
     {
         public bool Key = false;
         public string Tips = string.Empty;
+        public bool MapToData = false;
     }
 
     [AttributeUsage(AttributeTargets.Class)]

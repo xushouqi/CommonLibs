@@ -250,6 +250,7 @@ namespace CommonLibs
 
         static string TryParseTypeName(string methodReturnTypeName)
         {
+            bool isArray = methodReturnTypeName.EndsWith("[]");
             var mc = GetSubTypeName(ref methodReturnTypeName, @"Models\.(?!ViewModels)[A-Za-z]*");
             if (mc == null || mc.Length == 0)
             {
@@ -264,6 +265,8 @@ namespace CommonLibs
                 int start = "Models.".Length;
                 methodReturnTypeName = mc.Value.Substring(start, mc.Value.Length - start);
             }
+            if (isArray)
+                methodReturnTypeName += "[]";
             return methodReturnTypeName;
         }
         static Match GetSubTypeName(ref string typeName, string pattern)

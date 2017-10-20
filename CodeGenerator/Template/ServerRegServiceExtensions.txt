@@ -1,9 +1,10 @@
-﻿
-using Microsoft.AspNetCore.Hosting;
+﻿using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using CommonLibs;
 using CommonServices;
+using GodModels;
+using #ModelProject#;
 
 namespace #ProjectName#
 {

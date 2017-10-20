@@ -1,15 +1,16 @@
 ﻿using System;
 using System.Threading.Tasks;
 using System.Threading;
+using System.Reflection;
 using System.Collections.Concurrent;
 using CommonLibs;
 
 namespace CommonNetwork
 {
-    public class RoomManager : IRoomManager
+    public class RoomManager<T> : IRoomManager where T : RoomBase
     {
         private readonly IServiceProvider m_services;
-        private ConcurrentDictionary<int, RoomBase> m_rooms;
+        private ConcurrentDictionary<int, T> m_rooms;
         private ConcurrentQueue<UserData> m_waitingList;
 
         private int m_nextId = 0;
@@ -17,14 +18,14 @@ namespace CommonNetwork
         public RoomManager(IServiceProvider services)
         {
             m_services = services;
-            m_rooms = new ConcurrentDictionary<int, RoomBase>();
+            m_rooms = new ConcurrentDictionary<int, T>();
             m_waitingList = new ConcurrentQueue<UserData>();
         }
 
         public RoomBase CreateRoom(UserData userData)
         {
             var id = Interlocked.Increment(ref m_nextId);
-            var rm = new RoomBase(id, m_services, this);
+            var rm = (T)Activator.CreateInstance(typeof(T), id, m_services);
             if (m_rooms.TryAdd(id, rm))
             {
                 rm.Enter(userData);
@@ -34,14 +35,14 @@ namespace CommonNetwork
 
         public RoomBase GetRoom(int id)
         {
-            m_rooms.TryGetValue(id, out RoomBase rm);
+            m_rooms.TryGetValue(id, out T rm);
             return rm;
         }
 
         public bool RemoveRoom(int id)
         {
             bool ret = false;
-            if (m_rooms.TryRemove(id, out RoomBase rm))
+            if (m_rooms.TryRemove(id, out T rm))
             {
                 ret = true;
                 rm.Close();
@@ -56,17 +57,27 @@ namespace CommonNetwork
         /// <returns></returns>
         public bool AddToWaitingList(UserData userData)
         {
-            bool ret = false;
-            if (m_waitingList.TryDequeue(out UserData hoster))
+            bool ret = true;
+            var wlist = m_waitingList.ToArray();
+            for (int i = 0; i < wlist.Length; i++)
             {
-                ret = true;
-                Task task = new Task(() => InitialRoom(hoster, userData));
-                task.Start();
+                if (wlist[i].ID == userData.ID)
+                {
+                    //ret = false;
+                    break;
+                }
             }
-            else
+            if (ret)
             {
-                ret = true;
-                m_waitingList.Enqueue(userData);
+                if (m_waitingList.TryDequeue(out UserData hoster))
+                {
+                    Task task = new Task(() => InitialRoom(hoster, userData));
+                    task.Start();
+                }
+                else
+                {
+                    m_waitingList.Enqueue(userData);
+                }
             }
             return ret;
         }

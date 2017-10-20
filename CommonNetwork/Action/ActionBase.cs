@@ -51,6 +51,7 @@ namespace CommonNetwork
         {
             if (m_return != null)
             {
+                m_package.Type = PackageTypeEnum.Act;
                 m_package.ErrorCode = m_return.ErrorCode;
                 if (m_return.Data != null)
                     m_package.Return = ProtoBufUtils.Serialize(m_return.Data);

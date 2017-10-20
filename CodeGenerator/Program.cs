@@ -48,6 +48,9 @@ namespace CodeGenerator
                 int lastOfPath = runPath.LastIndexOf(@"\CodeGenerator");
                 if (lastOfPath > 0)
                     solutionPath = runPath.Substring(0, lastOfPath);
+                lastOfPath = solutionPath.LastIndexOf(@"\Common");
+                if (lastOfPath > 0)
+                    solutionPath = solutionPath.Substring(0, lastOfPath);
 
                 //模版地址
                 string template_path = arguments.TemplatePath;
@@ -75,7 +78,7 @@ namespace CodeGenerator
 
                 Assembly myAssembly = null;
                 Assembly commonAssembly = null;
-                Assembly modelsAssembly = null;
+                List<Assembly> modelsAssemblyList = new List<Assembly>();
 
                 //加载同一目录下的所有dll
                 var files = Directory.GetFiles(dllPath, "*.dll");
@@ -91,7 +94,7 @@ namespace CodeGenerator
                         commonAssembly = assembly;
                     //XXXModels
                     else if (filename.Contains("Models"))
-                        modelsAssembly = assembly;
+                        modelsAssemblyList.Add(assembly);
                     //主程序
                     else if (filename.ToLower().Contains(project_name.ToLower()))
                         myAssembly = assembly;
@@ -110,6 +113,9 @@ namespace CodeGenerator
                 string serviceName = project_name + ".Services";
                 Console.WriteLine("CodeGenerator types={0}, serviceName={1}", types.Length, serviceName);
 
+                //寻找相同的model
+                Assembly modelsAssembly = null;
+
                 List<Type> socketTypeList = new List<Type>();
                 List<Type> dataTypeList = new List<Type>();
                 for (int i = 0; i < types.Length; i++)
@@ -123,19 +129,32 @@ namespace CodeGenerator
                         project_name = tName.Split('.')[0];
                         server_path = solutionPath + @"\" + project_name;
 
+                        if (modelsAssemblyList.Count > 0)
+                        {
+                            modelsAssembly = modelsAssemblyList[0];
+                            for (int m = 0; m < modelsAssemblyList.Count; m++)
+                            {
+                                if (modelsAssemblyList[m].FullName.StartsWith(project_name.Substring(0, 4)))
+                                {
+                                    modelsAssembly = modelsAssemblyList[m];
+                                    break;
+                                }
+                            }
+                        }
+
                         if (myType.GetTypeInfo().IsDefined(commonAssembly.GetType(typeof(WebApiAttribute).FullName), false))
                         {
-                            client_path = solutionPath + @"\ClientApiConnector\WebApi\" + project_name + @"\";
-
+                            client_path = solutionPath + @"\Client\" + project_name + @"Client\WebApi\";
+                            
                             GenerateWebApiConnector.InitPath(modelsAssembly, template_path, project_name, server_path, client_path);
                             GenerateWebApiConnector.GenerateFromService(myType, arguments.ClientApi);
                         }
                         if (myType.GetTypeInfo().IsDefined(typeof(WebSocketAttribute), false))
                         {
-                            client_path = solutionPath + @"\ClientApiConnector\WebSocket\" + project_name + @"\";
+                            client_path = solutionPath + @"\Client\" + project_name + @"Client\Socket\";
 
-                            GenerateWebSocketClient.InitPath(modelsAssembly, template_path, project_name, server_path, client_path);
-                            GenerateWebSocketClient.GenerateFromService(myType, arguments.ClientApi);
+                            GenerateSocketClient.InitPath(modelsAssembly, template_path, project_name, server_path, client_path);
+                            GenerateSocketClient.GenerateFromService(myType, arguments.ClientApi);
 
                             socketTypeList.Add(myType);
                         }
@@ -146,15 +165,26 @@ namespace CodeGenerator
                 {
                     client_path = "";
 
-                    GenerateWebSocketClasses.InitPath(modelsAssembly, template_path, project_name, server_path, client_path);
-                    GenerateWebSocketClasses.GenerateFromService(socketTypeList.ToArray(), arguments.ClientApi);
+                    GenerateSocketClasses.InitPath(modelsAssembly, template_path, project_name, server_path, client_path);
+                    GenerateSocketClasses.GenerateFromService(socketTypeList.ToArray(), arguments.ClientApi);
                 }
 
-
+                string modelProjectName = "";
                 Type[] modelTypes;
                 try
                 {
-                    modelTypes = modelsAssembly.GetTypes();
+                    //modelTypes = modelsAssembly.GetTypes();
+
+                    var typelist = new List<Type>();
+                    for (int m = 0; m < modelsAssemblyList.Count; m++)
+                    {
+                        var mTypes = modelsAssemblyList[m].GetTypes();
+                        typelist.AddRange(mTypes);
+
+                        if (!modelsAssemblyList[m].FullName.Contains("GodModels") || modelsAssemblyList.Count == 1)
+                            modelProjectName = modelsAssemblyList[m].FullName.Split(',')[0];
+                    }
+                    modelTypes = typelist.ToArray();
                 }
                 catch (ReflectionTypeLoadException e)
                 {
@@ -167,7 +197,7 @@ namespace CodeGenerator
                     {
                         var tName = myType.FullName;
 
-                        project_name = tName.Split('.')[0];
+                        //project_name = tName.Split('.')[0];
 
                         if (myType.GetTypeInfo().IsDefined(commonAssembly.GetType(typeof(DataModelsAttribute).FullName), false))
                         {
@@ -178,9 +208,9 @@ namespace CodeGenerator
 
                 if (dataTypeList.Count > 0)
                 {
-                    string models_path = solutionPath + @"\" + project_name + @"\ViewModels\";
+                    string models_path = solutionPath + @"\Models\" + modelProjectName + @"\ViewModels\";
 
-                    GenerateDataModel.InitPath(template_path, project_name, server_path, models_path);
+                    GenerateDataModel.InitPath(template_path, project_name, modelProjectName, server_path, models_path);
                     GenerateDataModel.GenerateFromData(dataTypeList.ToArray());
                 }
             }

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using CommonLibs;
+using GodModels.ViewModels;
 using #ModelProject#.ViewModels;
 
 namespace CommonNetwork
@@ -10,10 +11,12 @@ namespace CommonNetwork
         protected ConcurrentDictionary<int, Action<WebPackage>> m_sockePusherById = null;
         protected ConcurrentDictionary<Type, int> m_actionIdByType = null;
 
-        public PushManager()
+        private readonly PackageManager m_packageManager;
+        public PushManager(PackageManager packManager)
         {
             m_sockePusherById = new ConcurrentDictionary<int, Action<WebPackage>>();
             m_actionIdByType = new ConcurrentDictionary<Type, int>();
+            m_packageManager = packManager;
 
             RegActionIds();
         }
@@ -33,19 +36,6 @@ namespace CommonNetwork
             m_sockePusherById.TryRemove(userData.ID, out data);
         }
 
-        private int m_id = 90000000;
-        private WebPackage CreatePackage(int actionId, byte[] param, int accountId = 0)
-        {
-            var package = new WebPackage
-            {
-                ActionId = actionId,
-                Uid = accountId,
-                ID = System.Threading.Interlocked.Increment(ref m_id),
-                Params = param,
-            };
-            return package;
-        }
-
         /// <summary>
         /// 自动推送更新数据对象到客户端
         /// </summary>
@@ -58,9 +48,8 @@ namespace CommonNetwork
             if (m_sockePusherById.ContainsKey(id) && m_actionIdByType.ContainsKey(atype))
             {
                 int actionId = m_actionIdByType[atype];
-                var package = CreatePackage(actionId, null);
-                package.ErrorCode = (int)ErrorCodeEnum.Success;
-                package.Return = ProtoBufUtils.Serialize(data);
+                var ret = ProtoBufUtils.Serialize(data);
+                var package = m_packageManager.CreateActPackage(actionId, 0, 0, ret, ErrorCodeEnum.Success);
 
                 m_sockePusherById[id](package);
             }

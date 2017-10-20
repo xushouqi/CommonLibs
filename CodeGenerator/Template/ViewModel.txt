@@ -1,6 +1,7 @@
 ﻿using ProtoBuf;
+using #ModelProject#;
 
-namespace #ProjectName#.ViewModels
+namespace #ModelProject#.ViewModels
 {
     [ProtoContract]
     public class #TypeName#Data

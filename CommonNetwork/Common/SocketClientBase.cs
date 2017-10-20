@@ -17,17 +17,22 @@ namespace CommonNetwork
         public Action<string> OnError = null;
 
         protected int m_id = 0;
-        protected int TimeOutMilliseconds = 5000;
-        protected int BufferSize = 1024;
+        protected int TimeOutMilliseconds = 60000;
+        protected int BufferSize = 4096;
+        protected bool AutoDispatch = true;
 
-        public SocketClientBase()
+        protected PackageManager m_packageManager;
+
+        public SocketClientBase(bool autoDispatch = true)
         {
             m_id = 0;
-
+            AutoDispatch = autoDispatch;
             RegActions = new Dictionary<int, Action<WebPackage>>();
             m_callbacks = new Dictionary<int, Action<WebPackage>>();
             m_semaphores = new Dictionary<int, Semaphore>();
             m_packages = new Dictionary<int, WebPackage>();
+
+            m_packageManager = new PackageManager(900000000);
         }
 
         public void AddOnConnect(Action<bool, string> callback)
@@ -59,19 +64,24 @@ namespace CommonNetwork
             RegActions[actionId] = callback;
         }
 
-        protected WebPackage CreatePackage(int actionId, byte[] param, int accountId = 0)
-        {
-            var package = new WebPackage
-            {
-                ActionId = actionId,
-                Uid = accountId,
-                ID = System.Threading.Interlocked.Increment(ref m_id),
-                Params = param,
-            };
-            return package;
-        }
+        object m_lock_pacakges = new object();
+        List<WebPackage> m_package_list = new List<WebPackage>();
 
         public void DoReceivePackage(WebPackage package)
+        {
+            if (AutoDispatch)
+            {
+                TryDispatchPackage(package);
+            }
+            else
+            {
+                lock (m_lock_pacakges)
+                {
+                    m_package_list.Add(package);
+                }
+            }
+        }
+        void TryDispatchPackage(WebPackage package)
         {
             m_packages[package.ID] = package;
             //根据ActionId注册
@@ -93,5 +103,27 @@ namespace CommonNetwork
             }
         }
 
+        public void Dispatch()
+        {
+            List<WebPackage> tmp_list = null;
+
+            lock (m_lock_pacakges)
+            {
+                if (m_package_list.Count > 0)
+                {
+                    tmp_list = new List<WebPackage>(m_package_list);
+                    m_package_list.Clear();
+                }
+            }
+
+            if (tmp_list != null)
+            {
+                for (int i = 0; i < tmp_list.Count; i++)
+                {
+                    var package = tmp_list[i];
+                    TryDispatchPackage(package);
+                }
+            }
+        }
     }
 }

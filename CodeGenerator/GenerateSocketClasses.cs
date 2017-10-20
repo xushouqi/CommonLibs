@@ -5,7 +5,7 @@ using CommonLibs;
 
 namespace CodeGenerator
 {
-    class GenerateWebSocketClasses
+    class GenerateSocketClasses
     {
         static string m_template_path = string.Empty;
         static string m_server_path = string.Empty;

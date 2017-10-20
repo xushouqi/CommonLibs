@@ -9,6 +9,7 @@ namespace CommonNetwork
     {
         bool CheckConnection();
         Task<bool> ConnectServerAsync(string address, int port, Action<bool, string> onConnect = null);
+        bool ConnectServer(string address, int port, Action<bool, string> onConnect = null);
         void CloseConnection();
         WebPackage Send(int actionId, byte[] param, Action<WebPackage> callback);
         Task<WebPackage> SendAsync(int actionId, byte[] param);
@@ -19,5 +20,6 @@ namespace CommonNetwork
         void RemoveOnConnect(Action<bool, string> callback);
         void RemoveDisconnect(Action<string> callback);
         void RemoveOnError(Action<string> callback);
+        void Dispatch();
     }
 }

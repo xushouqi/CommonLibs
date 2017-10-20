@@ -9,25 +9,16 @@ namespace CommonNetwork
 {
     public class WebSocketClient : SocketClientBase, ISocketClient
     {
-        private static WebSocketClient m_instance = null;
-        public static WebSocketClient Instance
-        {
-            get
-            {
-                if (m_instance == null)
-                {
-                    m_instance = new WebSocketClient();
-                }
-                return m_instance;
-            }
-        }
-
         private ClientWebSocket m_socket;
         private string m_url = "ws://127.0.0.1:22337/ws";
 
         private Task m_waitReceiver;
 
-        public WebSocketClient()
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="autoDispatch">是否自动分发，Unity中选择False</param>
+        public WebSocketClient(bool autoDispatch) : base(autoDispatch)
         {
             try
             {
@@ -44,7 +35,46 @@ namespace CommonNetwork
             bool ret = m_socket != null && m_socket.State == WebSocketState.Open;
             return ret;
         }
-        
+
+        CancellationTokenSource m_receiveCancelSource;
+
+        public bool ConnectServer(string address, int port, Action<bool, string> onConnect = null)
+        {
+            if (m_socket != null
+                 && (m_socket.State == WebSocketState.Connecting || m_socket.State == WebSocketState.Open)
+                 )
+                return false;
+
+            m_url = string.Concat("ws://", address, ":", port, "/ws");
+            string message = "OK";
+            bool success = false;
+            try
+            {
+                if (m_receiveCancelSource == null)
+                {
+                    m_socket.ConnectAsync(new Uri(m_url), new CancellationTokenSource(TimeOutMilliseconds).Token).Wait();
+
+                    m_receiveCancelSource = new CancellationTokenSource();
+                    Task task = new Task(() => { WaitReceive().Wait(m_receiveCancelSource.Token); });
+                    task.Start();
+                    success = true;
+                }
+                else
+                    message = "WaitReceive is Still Running!!! Can't Connect!!!";
+            }
+            catch (Exception ex)
+            {
+                message = ex.Message;
+                success = false;
+                ClientCommon.DebugLog(message);
+            }
+            if (OnConnect != null)
+                OnConnect(success, message);
+            if (onConnect != null)
+                onConnect(success, message);
+            return success;
+        }
+
         public async Task<bool> ConnectServerAsync(string address, int port, Action<bool, string> onConnect = null)
         {
             if (m_socket != null
@@ -57,16 +87,17 @@ namespace CommonNetwork
             bool success = false;
             try
             {
-                if (m_waitReceiver == null || m_waitReceiver.Status != TaskStatus.Running)
+                if (m_receiveCancelSource == null)
                 {
                     await m_socket.ConnectAsync(new Uri(m_url), new CancellationTokenSource(TimeOutMilliseconds).Token);
 
-                    m_waitReceiver = new Task(() => { WaitReceive().Wait(); });
-                    m_waitReceiver.Start();
+                    m_receiveCancelSource = new CancellationTokenSource();
+                    Task task = new Task(() => { WaitReceive().Wait(m_receiveCancelSource.Token); });
+                    task.Start();
                     success = true;
                 }
                 else
-                    message = "GodIdentity m_waitReceiver is Still Running!!! Can't Connect!!!";
+                    message = "WaitReceive is Still Running!!! Can't Connect!!!";
             }
             catch (Exception ex)
             {
@@ -160,7 +191,13 @@ namespace CommonNetwork
                 try
                 {
                     //m_socket.CloseAsync(WebSocketCloseStatus.Empty, "", new CancellationToken()).Wait();
-                    m_socket.CloseOutputAsync(WebSocketCloseStatus.Empty, "", new CancellationTokenSource(TimeOutMilliseconds).Token).Wait();
+                    m_socket.CloseOutputAsync(WebSocketCloseStatus.Empty, "", new CancellationTokenSource(TimeOutMilliseconds).Token);
+
+                    if (m_receiveCancelSource != null && !m_receiveCancelSource.IsCancellationRequested)
+                    {
+                        m_receiveCancelSource.Cancel();
+                        m_receiveCancelSource = null;
+                    }
                 }
                 catch (Exception e)
                 {
@@ -171,10 +208,9 @@ namespace CommonNetwork
 
         public WebPackage Send(int actionId, byte[] param, Action<WebPackage> callback)
         {
-            var package = CreatePackage(actionId, param);
-
+            var package = m_packageManager.CreateRequestPackage(actionId, 0, 0, param);
             var result = ProtoBufUtils.Serialize(package);
-            m_socket.SendAsync(new ArraySegment<byte>(result), WebSocketMessageType.Binary, true, new CancellationTokenSource(TimeOutMilliseconds).Token).Wait();
+            m_socket.SendAsync(new ArraySegment<byte>(result), WebSocketMessageType.Binary, true, new CancellationTokenSource(TimeOutMilliseconds).Token);
 
             m_callbacks[package.ID] = callback;
             return package;
@@ -185,24 +221,27 @@ namespace CommonNetwork
             WebPackage package = null;
             if (CheckConnection())
             {
-                package = CreatePackage(actionId, param);
-
+                package = m_packageManager.CreateRequestPackage(actionId, 0, 0, param);
                 var result = ProtoBufUtils.Serialize(package);
                 await m_socket.SendAsync(new ArraySegment<byte>(result), WebSocketMessageType.Binary, true, new CancellationTokenSource(TimeOutMilliseconds).Token);
 
-                Task task = new Task(() =>
+                Task<bool> task = new Task<bool>(() =>
                 {
                     Semaphore mux = new Semaphore(0, int.MaxValue);
                     m_semaphores[package.ID] = mux;
-                    mux.WaitOne();
+                    bool ret = mux.WaitOne(TimeOutMilliseconds);
+                    return ret;
                 });
                 task.Start();
-                if (Task.WaitAll(new Task[] { task }, TimeOutMilliseconds))
+                Task.WaitAll(task);
+                if (task.Result)
                     m_packages.TryGetValue(package.ID, out package);
                 else
                     package.ErrorCode = ErrorCodeEnum.TimeOut;
             }
-            return package;
+            else
+                package = m_packageManager.CreatePackage(PackageTypeEnum.Act, actionId, 0, 0, ErrorCodeEnum.Disconnected);
+            return await Task.FromResult(package);
         }
 
     }

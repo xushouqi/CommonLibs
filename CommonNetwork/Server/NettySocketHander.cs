@@ -67,6 +67,8 @@ namespace CommonNetwork
         {
             base.ChannelInactive(context);
             m_userSocketManager.Remove(context);
+            //移除user
+            int id = m_userManager.RemoveUser(context.Channel.Id.ToString());
         }
 
         /// <summary>
@@ -76,6 +78,8 @@ namespace CommonNetwork
         /// <param name="message"></param>
         public override void ChannelRead(IChannelHandlerContext context, object message)
         {
+            m_logger.LogInformation("ChannelRead: {0}", context.Channel.Id);
+
             var buffer = message as IByteBuffer;
             if (buffer != null)
             {
@@ -165,23 +169,32 @@ namespace CommonNetwork
                             else
                                 result = action.GetUnAuthorizedPackage(package);
 
-                            //回包
-                            await SendAsync(channel, package);
-
-                            m_logger.LogError("NettyAct: {0}, thread={1}, DoActionTime: {2}ms",
+                            m_logger.LogInformation("NettyAct: {0}, thread={1}, DoActionTime: {2}ms",
                                 actionName, Thread.CurrentThread.ManagedThreadId, sw.Elapsed.TotalMilliseconds);
 
                             //其他后续操作
                             await action.AfterAction();
                         }
                         else
+                        {
+                            package.ErrorCode = ErrorCodeEnum.NotValid;
                             m_logger.LogError("Uid NOT Found!!! {0}", actionName);
+                        }
                     }
                     else
+                    {
+                        package.ErrorCode = ErrorCodeEnum.NoAction;
                         m_logger.LogError("{0} NOT Found!!!", actionName);
+                    }
                 }
                 else
+                {
+                    package.ErrorCode = ErrorCodeEnum.NoAction;
                     m_logger.LogError("{0} NOT Found!!!", actionName);
+                }
+
+                //回包
+                await SendAsync(channel, package);
             }
             catch (Exception e)
             {
@@ -191,12 +204,12 @@ namespace CommonNetwork
 
         private async void PushToClient(WebPackage package)
         {
-            await m_userSocketManager.SendPackageToUser(package);
-            m_logger.LogInformation("PushToClient.Send {0}, data={1}", Thread.CurrentThread.ManagedThreadId, package.ID);
+            await m_userSocketManager.SendPackageToUserAsync(package);
         }
         private async Task SendAsync(string channel, WebPackage package)
         {
-            await m_userSocketManager.SendPackageToUser(package);
+            m_logger.LogInformation("SendAsync thread={0}, pid={1}, channel={1}", Thread.CurrentThread.ManagedThreadId, package.ID, channel);
+            await m_userSocketManager.SendPackageToUserAsync(UserConnTypeEnum.Tcp, channel, package);
         }
 
         /// <summary>

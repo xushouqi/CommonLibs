@@ -11,13 +11,15 @@ namespace CodeGenerator
         static string m_server_path = string.Empty;
         static string m_models_path = string.Empty;
         static string m_project_name = string.Empty;
+        static string m_modelProject = string.Empty;
 
-        public static void InitPath(string template, string projectName, string server_path, string models_path)
+        public static void InitPath(string template, string projectName, string modelProject, string server_path, string models_path)
         {
             m_template_path = template;
             m_server_path = server_path;
             m_models_path = models_path;
             m_project_name = projectName;
+            m_modelProject = modelProject;
         }
 
         public static void GenerateFromData(Type[] types)
@@ -25,7 +27,6 @@ namespace CodeGenerator
             string cacheStr = "";
             string repoStr = "";
             string modelStr = "";
-            string modelPrject = string.Empty;
             string switchCache = "";
 
             for (int i = 0; i < types.Length; i++)
@@ -33,8 +34,6 @@ namespace CodeGenerator
                 Type ptype = types[i];
 
                 var proTypeName = ptype.FullName;
-
-                modelPrject = ptype.FullName.Split(",")[0];
 
                 proTypeName = Common.GetReturnTypeName(proTypeName);
                 proTypeName = Common.GetSimpleTypeName(proTypeName);
@@ -71,6 +70,13 @@ namespace CodeGenerator
 
                         if (attributes.Key)
                             keyType = pMember.PropertyType;
+                        if (attributes.MapToData)
+                        {
+                            if (mpType.EndsWith("[]"))
+                                mpType = mpType.Substring(0, mpType.Length - 2) + "Data[]";
+                            else
+                                mpType += "Data";
+                        }
 
                         string tips = attributes.Tips;
                         if (!string.IsNullOrEmpty(tips))
@@ -103,12 +109,13 @@ namespace CodeGenerator
                 //cacheStr += "            services.AddSingleton<ICacheClient<" + className + ">, HybridCacheClient<" + className + ">>();\n";
 
                 //ViewModels
-                if (!string.IsNullOrEmpty(m_models_path))
+                if (!string.IsNullOrEmpty(m_models_path) && ptype.FullName.StartsWith(m_modelProject.Substring(0, 3)))
                 {
                     string vm_class = CodeCommon.GetTemplate(m_template_path, "ViewModel.txt");
                     vm_class = vm_class.Replace("#TypeName#", className);
                     vm_class = vm_class.Replace("#Datas#", dataStr);
                     vm_class = vm_class.Replace("#ProjectName#", m_project_name);
+                    vm_class = vm_class.Replace("#ModelProject#", m_modelProject);
 
                     string vfileName = m_models_path + className + "Data.cs";
                     CodeCommon.WriteFile(vfileName, vm_class);
@@ -125,14 +132,15 @@ namespace CodeGenerator
             string server_class = CodeCommon.GetTemplate(m_template_path, "ServerMapperModelsExtension.txt");
             server_class = server_class.Replace("#MapperData#", modelStr);
             server_class = server_class.Replace("#ProjectName#", m_project_name);
+            server_class = server_class.Replace("#ModelProject#", m_modelProject);
 
             string fileName = m_server_path + @"\Data\AutoMapperExtensions.cs";
             CodeCommon.WriteFile(fileName, server_class);
 
             //repository
             string repo_class = CodeCommon.GetTemplate(m_template_path, "ServerRegServiceExtensions.txt");
-            repo_class = repo_class.Replace("#ModelProject#", modelPrject);
             repo_class = repo_class.Replace("#ProjectName#", m_project_name);
+            repo_class = repo_class.Replace("#ModelProject#", m_modelProject);
             repo_class = repo_class.Replace("#AddRepository#", repoStr +"\n"+ cacheStr);
 
             fileName = m_server_path + @"\Data\RegServiceExtensions.cs";

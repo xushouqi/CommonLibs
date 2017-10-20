@@ -59,7 +59,60 @@ namespace CommonNetwork
                 }
             }
         }
-        
+
+        public bool ConnectServer(string address, int port, Action<bool, string> onConnect = null)
+        {
+            bool ret = false;
+            string message = "";
+            m_group = new MultithreadEventLoopGroup();
+
+            X509Certificate2 cert = null;
+            string targetHost = null;
+            if (m_config.IsSsl)
+            {
+                string curpath = Directory.GetCurrentDirectory();
+                cert = new X509Certificate2(Path.Combine(curpath, "dotnetty.com.pfx"), "password");
+                targetHost = cert.GetNameInfo(X509NameType.DnsName, false);
+            }
+            try
+            {
+                var bootstrap = new Bootstrap();
+                bootstrap
+                    .Group(m_group)
+                    .Channel<TcpSocketChannel>()
+                    .Option(ChannelOption.TcpNodelay, true)
+                    .Option(ChannelOption.SoKeepalive, true)
+                    .Handler(new ActionChannelInitializer<ISocketChannel>(channel =>
+                    {
+                        IChannelPipeline pipeline = channel.Pipeline;
+                        if (cert != null)
+                        {
+                            pipeline.AddLast("tls", new TlsHandler(stream => new SslStream(stream, true, (sender, certificate, chain, errors) => true), new ClientTlsSettings(targetHost)));
+                        }
+                        pipeline.AddLast(new LoggingHandler());
+                        //pipeline.AddLast("framing-enc", new LengthFieldPrepender(2));
+                        //pipeline.AddLast("framing-dec", new LengthFieldBasedFrameDecoder(ushort.MaxValue, 0, 2, 0, 2));
+
+                        // 用于检查链接的状态，比如写超时，读超时, 发送心跳包
+                        pipeline.AddLast("timeout", new IdleStateHandler(0, 0, m_config.HeartbeatInterval / 1000));
+
+                        pipeline.AddLast("echo", new PackageClientHandler(this));
+                    }));
+
+                m_clientChannel = bootstrap.ConnectAsync(new IPEndPoint(IPAddress.Parse(address), port)).GetAwaiter().GetResult();
+                ret = m_clientChannel != null;
+            }
+            finally
+            {
+                //await group.ShutdownGracefullyAsync(TimeSpan.FromMilliseconds(100), TimeSpan.FromSeconds(1));
+            }
+            if (OnConnect != null)
+                OnConnect(ret, message);
+            if (onConnect != null)
+                onConnect(ret, message);
+            return ret;
+        }
+
         public async Task<bool> ConnectServerAsync(string address, int port, Action<bool, string> onConnect = null)
         {
             bool ret = false;
@@ -115,7 +168,7 @@ namespace CommonNetwork
 
         public WebPackage Send(int actionId, byte[] param, Action<WebPackage> callback)
         {
-            var package = CreatePackage(actionId, param);
+            var package = m_packageManager.CreateRequestPackage(actionId, 0, 0, param);
 
             var msg = Unpooled.Buffer(m_config.BufferSize);
             byte[] bytes = ProtoBufUtils.Serialize(package);
@@ -131,7 +184,7 @@ namespace CommonNetwork
             WebPackage package = null;
             if (CheckConnection())
             {
-                package = CreatePackage(actionId, param);
+                package = m_packageManager.CreateRequestPackage(actionId, 0, 0, param);
 
                 var msg = Unpooled.Buffer(m_config.BufferSize);
                 byte[] bytes = ProtoBufUtils.Serialize(package);

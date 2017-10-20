@@ -8,7 +8,7 @@ using CommonLibs;
 
 namespace CodeGenerator
 {
-    class GenerateWebSocketClient
+    class GenerateSocketClient
     {
         static string m_template_path = string.Empty;
         static string m_server_path = string.Empty;

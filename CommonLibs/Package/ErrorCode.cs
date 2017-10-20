@@ -17,6 +17,7 @@ namespace CommonLibs
         NotValid,
         TimeOut,
         Disconnected,
+        NoAction,
 
         WrongPassword,
         InvalidDataformat,

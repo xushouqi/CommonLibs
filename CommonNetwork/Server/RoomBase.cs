@@ -6,7 +6,6 @@ using System.Reflection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.DependencyInjection;
 using CommonLibs;
-using ProtoBuf;
 
 namespace CommonNetwork
 {
@@ -19,7 +18,7 @@ namespace CommonNetwork
         Closed,
     }
 
-    public class RoomBase
+    public abstract class RoomBase
     {
         public int ID = 0;
         protected RoomStateEnum State = RoomStateEnum.None;
@@ -27,25 +26,26 @@ namespace CommonNetwork
         protected int TurnInterval = 66; //每Turn多少毫秒
         protected int BufferSize = 1024;
         protected int PrepareTime = 10000; //准备时长
+        protected int GameMaxTime = 3600000; //游戏最大时长
+        protected int EndShowTime = 10000; //结束后停留时长
 
-        private int m_total_tickcount = 0;
-        private int m_last_tickcount = 0;
+        protected int m_total_tickcount = 0;
+        protected int m_last_tickcount = 0;
 
-        private Task m_updateTask;
+        protected Task m_updateTask;
 
         protected UserData m_hoster = null;
-        protected Dictionary<int, UserData> m_members;
+        protected SortedDictionary<int, UserData> m_members;
         protected List<WebPackage> m_updatas;
         protected List<WebPackage> m_pushdatas;
         protected readonly UserSocketManager m_userSocketManager;
-        private readonly Assembly m_assembly;
-        private readonly string m_project_name;
-        private readonly IServiceProvider m_services;
-        private readonly ILogger m_logger;
-        private readonly IUserManager<UserData> m_userManager;
-        private readonly IRoomManager m_roomManager;
+        protected readonly Assembly m_assembly;
+        protected readonly string m_project_name;
+        protected readonly IServiceProvider m_services;
+        protected readonly ILogger m_logger;
+        protected readonly IUserManager<UserData> m_userManager;
 
-        public RoomBase(int id, IServiceProvider services, IRoomManager roomManager)
+        public RoomBase(int id, IServiceProvider services)
         {
             ID = id;
             m_services = services;
@@ -54,57 +54,84 @@ namespace CommonNetwork
             m_project_name = m_assembly.FullName.Split(',')[0];
             m_logger = services.GetService<ILoggerFactory>().CreateLogger("RoomService");
             m_userManager = services.GetService<IUserManager<UserData>>();
-            m_roomManager = roomManager;
 
-            m_members = new Dictionary<int, UserData>();
+            m_members = new SortedDictionary<int, UserData>();
             m_updatas = new List<WebPackage>();
             m_pushdatas = new List<WebPackage>();
 
             State = RoomStateEnum.None;
+
+            m_userManager.AddOnRemoveUser(OnRemoveUser);
         }
 
-        public virtual void Enter(UserData userData)
+        void OnRemoveUser(int uid)
+        {
+            if (m_members.ContainsKey(uid))
+            {
+                Leave(uid);
+            }
+        }
+
+        public void Enter(UserData userData)
         {
             if (State == RoomStateEnum.None)
             {
                 lock (m_members)
                 {
-                    if (m_hoster == null)
-                        m_hoster = userData;
+                    if (!m_members.ContainsKey(userData.ID))
+                    {
+                        if (m_hoster == null)
+                            m_hoster = userData;
 
-                    m_members.Add(userData.ID, userData);
+                        m_members.Add(userData.ID, userData);
+                    }
                 }
 
                 //下发客户端房间数据
-
-
                 //通知房间其他人有人进来了
+                OnEnter(userData);
             }
         }
-        public virtual void Leave(UserData userData)
+        protected virtual void OnEnter(UserData userData)
         {
+
+        }
+        public void Leave(int uid)
+        {
+            UserData userData = null;
             lock (m_members)
             {
-                if (m_members.ContainsKey(userData.ID))
-                    m_members.Remove(userData.ID);
-
-                if (m_hoster == userData)
+                if (m_members.TryGetValue(uid, out userData))
                 {
-                    if (m_members.Count > 0)
+                    m_members.Remove(uid);
+
+                    if (m_hoster != null && m_hoster.ID == uid)
                     {
-                        foreach (var item in m_members)
+                        if (m_members.Count > 0)
                         {
-                            m_hoster = item.Value;
-                            break;
+                            foreach (var item in m_members)
+                            {
+                                m_hoster = item.Value;
+                                break;
+                            }
                         }
+                        else
+                            m_hoster = null;
                     }
-                    else
-                        m_hoster = null;
+
+                    //没人了，删除房间
+                    if (m_members.Count == 0)
+                        Close();
                 }
-
-                //通知其他人有人离开了
-
             }
+
+            //通知其他人有人离开了
+            if (userData != null && State != RoomStateEnum.Closed)
+                OnLeave(userData);
+        }
+        protected virtual void OnLeave(UserData userData)
+        {
+
         }
 
         /// <summary>
@@ -126,7 +153,7 @@ namespace CommonNetwork
             }
         }
 
-        public virtual bool BeginPrepare()
+        public bool BeginPrepare()
         {
             bool ret = false;
             if (State == RoomStateEnum.None)
@@ -139,10 +166,16 @@ namespace CommonNetwork
 
                 m_updateTask = new Task(UpdateTask);
                 m_updateTask.Start();
+                OnBeginPrepare();
             }
             return ret;
         }
-        public virtual bool StartGame()
+        protected virtual void OnBeginPrepare()
+        {
+
+        }
+
+        public bool StartGame()
         {
             bool ret = false;
             if (State == RoomStateEnum.Prepare)
@@ -152,22 +185,45 @@ namespace CommonNetwork
                 //开始计时
                 m_total_tickcount = 0;
                 m_last_tickcount = 0;
+                OnStartGame();
             }
             return ret;
         }
-        public virtual bool EndGame()
+        protected virtual void OnStartGame()
+        {
+
+        }
+
+        public bool EndGame()
         {
             bool ret = false;
             if (State == RoomStateEnum.Start)
             {
                 State = RoomStateEnum.End;
                 ret = true;
+                //开始计时
+                m_total_tickcount = 0;
+                m_last_tickcount = 0;
+                OnEndGame();
             }
             return ret;
         }
-        public virtual void Close()
+        protected virtual void OnEndGame()
         {
-            State = RoomStateEnum.Closed;
+
+        }
+        public void Close()
+        {
+            if (State != RoomStateEnum.Closed)
+            {
+                State = RoomStateEnum.Closed;
+                OnClose();
+                //todo: destroy
+            }
+        }
+        protected virtual void OnClose()
+        {
+
         }
 
         private void UpdateTask()
@@ -178,17 +234,21 @@ namespace CommonNetwork
                 int delta = curtick - m_last_tickcount;
                 if (m_last_tickcount == 0 || delta >= TurnInterval)
                 {
-                    m_last_tickcount = curtick;
                     if (m_last_tickcount > 0)
                         m_total_tickcount += delta;
+                    m_last_tickcount = curtick;
 
                     if (State == RoomStateEnum.Prepare)
                     {
-                        UpdatePrepare();
+                        OnUpdatePrepare();
                     }
                     else if (State == RoomStateEnum.Start)
                     {
-                        UpdateTurn();
+                        OnUpdateTurn();
+                    }
+                    else if (State == RoomStateEnum.End)
+                    {
+                        OnUpdateEnd();
                     }
                     else
                         break;
@@ -201,15 +261,14 @@ namespace CommonNetwork
             }
         }
 
-        protected virtual void UpdatePrepare()
+        protected virtual void OnUpdatePrepare()
         {
             if (m_total_tickcount >= PrepareTime)
             {
                 StartGame();
             }
         }
-
-        private void UpdateTurn()
+        protected virtual void OnUpdateTurn()
         {
             Turn++;
 
@@ -238,7 +297,7 @@ namespace CommonNetwork
                                     action.DoAction().Wait();
                                     //获取返回值
                                     var retPackage = action.GetReturnPackage();
-                                    retPackage.ID = ID * 10000 + Turn * 1000 + i + 1;
+                                    retPackage.ID = ID * 2 + Turn * 1000 + i + 1;
                                     //加入待下发列表
                                     m_pushdatas.Add(retPackage);
                                 }
@@ -271,6 +330,18 @@ namespace CommonNetwork
                 }
                 Task.WaitAll(tasklist.ToArray());
             }
+
+            //超出最大时长，结束
+            if (m_total_tickcount >= GameMaxTime)
+                EndGame();
+        }
+
+        protected virtual void OnUpdateEnd()
+        {
+            if (m_total_tickcount >= EndShowTime)
+            {
+                Close();
+            }
         }
 
         protected void PushToClient(UserData userData, WebPackage[] datas)
@@ -279,7 +350,7 @@ namespace CommonNetwork
             {
                 var package = datas[i].ShallowCopy();
                 package.Uid = userData.ID;
-                m_userSocketManager.SendPackageToUser(package).Wait();
+                m_userSocketManager.SendPackageToUserAsync(package).Wait();
             }
         }
     }
