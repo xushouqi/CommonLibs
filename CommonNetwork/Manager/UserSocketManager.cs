@@ -11,6 +11,9 @@ using ProtoBuf;
 
 namespace CommonNetwork
 {
+    /// <summary>
+    /// 管理客户端连接
+    /// </summary>
     public class UserSocketManager
     {
         private ConcurrentDictionary<string, IChannelHandlerContext> m_contexts;

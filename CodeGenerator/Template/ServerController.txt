@@ -11,8 +11,6 @@ using AutoMapper;
 using Microsoft.Extensions.Logging;
 using #ModelProject#;
 using #ModelProject#.ViewModels;
-using GodModels;
-using GodModels.ViewModels;
 
 namespace #ProjectName#.Controllers
 {

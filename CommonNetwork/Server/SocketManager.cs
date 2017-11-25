@@ -17,7 +17,7 @@ namespace CommonNetwork
         public byte[] buffer;
         public bool isWeb = false;
     }
-
+    
     public class SocketManager
     {
         private Dictionary<string, Session> SessionPool = new Dictionary<string, Session>();

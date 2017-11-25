@@ -23,6 +23,10 @@ namespace CommonLibs
     [AttributeUsage(AttributeTargets.Method)]
     public class ApiAttribute : System.Attribute
     {
+        /// <summary>
+        /// 命令行缩写命令
+        /// </summary>
+        public string CmdName = string.Empty;
         public int ActionId;
         public Type ReturnType = null;
         //public bool IsGet = false;
@@ -38,6 +42,10 @@ namespace CommonLibs
     [AttributeUsage(AttributeTargets.Class)]
     public class WebApiAttribute : System.Attribute
     {
+        /// <summary>
+        /// 命令行中的缩写名称
+        /// </summary>
+        public string CmdName = string.Empty;
         public string RSAKeyName = string.Empty;
     }
 
@@ -64,6 +72,9 @@ namespace CommonLibs
         public UserTypeEnum AuthPolicy = UserTypeEnum.None;
     }
 
+    /// <summary>
+    /// 需持久化或同步的数据字段
+    /// </summary>
     [AttributeUsage(AttributeTargets.Property)]
     public class DataViewAttribute : System.Attribute
     {

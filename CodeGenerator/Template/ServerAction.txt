@@ -6,8 +6,6 @@ using #ProjectName#.Services;
 using CommonLibs;
 using CommonNetwork;
 using AutoMapper;
-using GodModels;
-using GodModels.ViewModels;
 using #ModelProject#;
 using #ModelProject#.ViewModels;
 

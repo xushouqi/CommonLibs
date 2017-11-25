@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.IO;
+using System.Threading;
 
 namespace CommonLibs
 {
@@ -13,6 +15,31 @@ namespace CommonLibs
 
         private object m_lock_me = new object();
         private Dictionary<string, Dictionary<int, object>> m_locks = new Dictionary<string, Dictionary<int, object>>();
+
+        public ConcurrentDictionary<int, AutoResetEvent> RequestHnadles = new ConcurrentDictionary<int, AutoResetEvent>();
+
+        private int activeReqId = 0;
+        private ConcurrentDictionary<int, string> m_reqIds = new ConcurrentDictionary<int, string>();
+
+        public int GetReqId(string pattern = "")
+        {
+            var id = System.Threading.Interlocked.Increment(ref activeReqId);
+            m_reqIds.AddOrUpdate(id, pattern, (key, oldValue) => pattern);
+            return id;
+        }
+        public bool CheckValidReqId(int reqId, out string pattern)
+        {
+            if (m_reqIds.ContainsKey(reqId))
+            {
+                m_reqIds.TryRemove(reqId, out pattern);
+                return true;
+            }
+            else
+            {
+                pattern = string.Empty;
+                return false;
+            }
+        }
 
         public object GetLockerById<T>(int id)
         {

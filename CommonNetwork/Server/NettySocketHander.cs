@@ -85,7 +85,7 @@ namespace CommonNetwork
             {
                 try
                 {
-                    var package = ProtoBufUtils.Deserialize<WebPackage>(buffer.ToArray());
+                    var package = ProtoBufUtils.Deserialize<WebPackage>(buffer.Array);
                     if (package != null)
                     {
                         //房间游戏数据，交给房间处理

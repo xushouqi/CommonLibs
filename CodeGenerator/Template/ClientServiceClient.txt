@@ -2,7 +2,6 @@
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using CommonLibs;
-using GodModels.ViewModels;
 using #ModelProject#.ViewModels;
 
 namespace CommonNetwork.#ProjectName#

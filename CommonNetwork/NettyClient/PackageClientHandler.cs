@@ -51,7 +51,7 @@ namespace CommonNetwork
             {
                 try
                 {
-                    var package = ProtoBufUtils.Deserialize<WebPackage>(byteBuffer.ToArray());
+                    var package = ProtoBufUtils.Deserialize<WebPackage>(byteBuffer.Array);
                     if (package != null)
                     {
                         m_parent.DoReceivePackage(package);
