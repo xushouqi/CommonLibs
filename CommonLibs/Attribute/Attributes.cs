@@ -42,10 +42,6 @@ namespace CommonLibs
     [AttributeUsage(AttributeTargets.Class)]
     public class WebApiAttribute : System.Attribute
     {
-        /// <summary>
-        /// 命令行中的缩写名称
-        /// </summary>
-        public string CmdName = string.Empty;
         public string RSAKeyName = string.Empty;
     }
 
